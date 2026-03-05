@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ARENA LIVE — WebXR Concert Experience</title>
+
+  <!-- A-Frame 1.5.0 -->
+  <script src="https://cdn.jsdelivr.net/npm/aframe@1.5.0/dist/aframe.min.js"></script>
+  <!-- A-Frame Extras (locomotion, teleport) -->
+  <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.2.0/dist/aframe-extras.min.js"></script>
+
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #000; overflow: hidden; font-family: 'Courier New', monospace; }
+
+    #loading-screen {
+      position: fixed; inset: 0; z-index: 9999;
+      background: #000;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      transition: opacity 1s ease;
+    }
+    #loading-screen.hidden { opacity: 0; pointer-events: none; }
+
+    .loading-title {
+      font-size: clamp(2rem, 6vw, 4rem);
+      font-weight: 900;
+      letter-spacing: 0.3em;
+      color: #fff;
+      text-transform: uppercase;
+      background: linear-gradient(90deg, #ff00ff, #00ffff, #ff00ff);
+      background-size: 200% auto;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: shimmer 2s linear infinite;
+    }
+    .loading-sub {
+      margin-top: 1.5rem;
+      font-size: 1rem;
+      letter-spacing: 0.5em;
+      color: #666;
+      text-transform: uppercase;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    .loading-bar-wrap {
+      margin-top: 2.5rem;
+      width: 300px; height: 2px;
+      background: #111;
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .loading-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #ff00ff, #00ffff);
+      animation: loadbar 2.5s ease forwards;
+    }
+    @keyframes shimmer {
+      to { background-position: 200% center; }
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 0.4; } 50% { opacity: 1; }
+    }
+    @keyframes loadbar {
+      from { width: 0; } to { width: 100%; }
+    }
+
+    #controls-hint {
+      position: fixed; bottom: 20px; left: 50%;
+      transform: translateX(-50%);
+      z-index: 100;
+      background: rgba(0,0,0,0.75);
+      border: 1px solid #333;
+      padding: 10px 24px;
+      border-radius: 4px;
+      color: #aaa;
+      font-size: 0.8rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+
+    #click-to-start {
+      position: fixed; inset: 0; z-index: 5000;
+      background: rgba(0,0,0,0.88);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      cursor: pointer;
+    }
+    #click-to-start h2 {
+      font-size: clamp(1.5rem, 4vw, 2.5rem);
+      font-weight: 900;
+      letter-spacing: 0.25em;
+      color: #fff;
+      text-transform: uppercase;
+      margin-bottom: 1rem;
+    }
+    #click-to-start p {
+      color: #888;
+      font-size: 0.85rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      line-height: 2;
+      text-align: center;
+    }
+    #click-to-start .key {
+      display: inline-block;
+      background: #222;
+      border: 1px solid #555;
+      border-radius: 4px;
+      padding: 2px 10px;
+      color: #ff00ff;
+      font-size: 0.9rem;
+      margin: 0 3px;
+    }
+    #click-to-start .start-btn {
+      margin-top: 2rem;
+      padding: 14px 42px;
+      background: transparent;
+      border: 2px solid #ff00ff;
+      color: #ff00ff;
+      font-family: 'Courier New', monospace;
+      font-size: 1rem;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    #click-to-start .start-btn:hover {
+      background: #ff00ff;
+      color: #000;
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAVIGATION INSTRUCTIONS
+  DESKTOP: WASD to move | Mouse click+drag to look | Click "Enter VR" button for immersive mode
+  META QUEST 3S: Left thumbstick to move | Right thumbstick to turn | Right trigger to teleport
+  Teleport targets are all floor surfaces (class="floor")
+-->
+
+<!-- LOADING SCREEN -->
+<div id="loading-screen">
+  <div class="loading-title">ARENA LIVE</div>
+  <div class="loading-sub">Loading Experience</div>
+  <div class="loading-bar-wrap"><div class="loading-bar"></div></div>
+</div>
+
+<!-- Click to start overlay -->
+<div id="click-to-start" style="display:none">
+  <h2>🎸 Enter Arena</h2>
+  <p>
+    Move &nbsp;<span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span> or <span class="key">↑ ↓ ← →</span><br>
+    Look around &nbsp;<span class="key">Mouse drag</span><br>
+    Speed boost &nbsp;<span class="key">Shift</span>
+  </p>
+  <button class="start-btn" id="enter-btn">ENTER THE ARENA</button>
+</div>
+
+<div id="controls-hint" style="display:none">
+  W/A/S/D = Move &nbsp;|&nbsp; Mouse Drag = Look &nbsp;|&nbsp; Arrow Keys = Move &nbsp;|&nbsp; Shift = Run
+</div>
+
+<!-- =====================================================================
+     A-FRAME SCENE
+     ===================================================================== -->
+<a-scene
+  vr-mode-ui="enabled: true"
+  renderer="antialias: true; colorManagement: true; sortObjects: true"
+  shadow="type: pcfsoft"
+  loading-screen="enabled: false">
+
+  <!-- ── ASSETS ── -->
+  <a-assets>
+    <!-- Audio placeholders: replace src with actual audio URLs -->
+    <!-- <a-sound id="crowd-ambient" src="URL_TO_CROWD_MURMUR.mp3" loop="true" autoplay="true"></a-sound> -->
+    <!-- <a-sound id="security-beep" src="URL_TO_BEEP.mp3" loop="true" autoplay="true"></a-sound> -->
+  </a-assets>
+
+  <!-- ── LIGHTING ── -->
+  <a-light type="ambient"     color="#ffffff" intensity="0.35"></a-light>
+  <a-light type="directional" color="#ffe5cc" intensity="0.6"  position="-1 4 -3" castShadow="true"></a-light>
+  <!-- Stage key spot -->
+  <a-light type="spot" color="#ffffff" intensity="2.5" position="0 18 0" target="#stage-platform" angle="35" penumbra="0.3"></a-light>
+  <!-- Entrance warm fill -->
+  <a-light type="point" color="#ffaa44" intensity="0.8" position="0 4 -55" distance="20"></a-light>
+  <!-- Security cold fill -->
+  <a-light type="point" color="#4488ff" intensity="0.7" position="0 4 -22" distance="18"></a-light>
+  <!-- Concourse fill -->
+  <a-light type="point" color="#ffffff" intensity="0.5" position="0 5 -10" distance="25"></a-light>
+  <!-- Animated stage lights (4 corners) -->
+  <a-light type="point" id="stagelight1" color="#ff00ff" intensity="1.5" position=" 10 12  10" distance="30">
+    <a-animation attribute="light.color" from="#ff00ff" to="#00ffff" dur="3000" direction="alternate" repeat="indefinite"></a-animation>
+  </a-light>
+  <a-light type="point" id="stagelight2" color="#00ffff" intensity="1.5" position="-10 12  10" distance="30">
+    <a-animation attribute="light.color" from="#00ffff" to="#ffcc00" dur="4000" direction="alternate" repeat="indefinite"></a-animation>
+  </a-light>
+  <a-light type="point" id="stagelight3" color="#ffcc00" intensity="1.5" position=" 10 12 -10" distance="30">
+    <a-animation attribute="light.color" from="#ffcc00" to="#ff00ff" dur="3500" direction="alternate" repeat="indefinite"></a-animation>
+  </a-light>
+  <a-light type="point" id="stagelight4" color="#ff3300" intensity="1.5" position="-10 12 -10" distance="30">
+    <a-animation attribute="light.color" from="#ff3300" to="#00ffff" dur="2500" direction="alternate" repeat="indefinite"></a-animation>
+  </a-light>
+
+  <!-- ── SKY ── -->
+  <a-sky color="#04000f"></a-sky>
+
+  <!-- ================================================================
+       CAMERA RIG — starts just inside main entrance
+       ================================================================ -->
+  <a-entity id="rig" position="0 0 -58">
+    <a-entity
+      id="camera"
+      camera="fov: 80"
+      look-controls="pointerLockEnabled: false; magicWindowTrackingEnabled: false"
+      wasd-controls="acceleration: 30; fly: false"
+      position="0 1.6 0">
+    </a-entity>
+
+    <!-- LEFT HAND (Quest) -->
+    <a-entity
+      id="leftHand"
+      laser-controls="hand: left"
+      teleport-controls="cameraRig: #rig; teleportOrigin: #camera; button: thumbstickup; collisionEntities: .floor; landingNormal: 0 1 0"
+      raycaster="objects: .floor">
+    </a-entity>
+
+    <!-- RIGHT HAND (Quest) -->
+    <a-entity
+      id="rightHand"
+      laser-controls="hand: right"
+      teleport-controls="cameraRig: #rig; teleportOrigin: #camera; button: trigger; collisionEntities: .floor; landingNormal: 0 1 0"
+      raycaster="objects: .floor">
+    </a-entity>
+  </a-entity>
+
+  <!-- ================================================================
+       OUTER ARENA STRUCTURE
+       ================================================================ -->
+  <!-- Outer wall cylinder (inside-facing) -->
+  <a-cylinder
+    radius="33"
+    height="22"
+    position="0 11 0"
+    material="color: #0e0e1c; side: back; roughness: 0.95"
+    segments-radial="32">
+  </a-cylinder>
+
+  <!-- Arena dome roof -->
+  <a-sphere
+    radius="36"
+    position="0 2 0"
+    material="color: #090912; side: back; roughness: 1"
+    theta-start="0"
+    theta-length="90"
+    segments-height="12"
+    segments-width="32">
+  </a-sphere>
+
+  <!-- Structural pillars (every 45deg) -->
+  <a-entity id="pillars">
+    <a-cylinder radius="0.55" height="20" position=" 32  10   0"  material="color: #1a1a2e; metalness:0.6; roughness:0.4" segments-radial="8"></a-cylinder>
+    <a-cylinder radius="0.55" height="20" position="-32  10   0"  material="color: #1a1a2e; metalness:0.6; roughness:0.4" segments-radial="8"></a-cylinder>
+    <a-cylinder radius="0.55" height="20" position="  0  10  32"  material="color: #1a1a2e; metalness:0.6; roughness:0.4" segments-radial="8"></a-cylinder>
+    <a-cylinder radius="0.55" height="20" position="  0  10 -32"  material="color: #1a1a2e; metalness:0.6; roughness:0.4" segments-radial="8"></a-cylinder>
+    <a-cylinder radius="0.55" height="20" position=" 22.6 10  22.6" material="color: #1a1a2e; metalness:0.6; roughness:0.4" segments-radial="8"></a-cylinder>
+    <a-cylinder radius="0.55" height="20" position="-22.6 10  22.6" material="color: #1a1a2e; metalness:0.6; roughness:0.4" segments-radial="8"></a-cylinder>
+    <a-cylinder radius="0.55" height="20" position=" 22.6 10 -22.6" material="color: #1a1a2e; metalness:0.6; roughness:0.4" segments-radial="8"></a-cylinder>
+    <a-cylinder radius="0.55" height="20" position="-22.6 10 -22.6" material="color: #1a1a2e; metalness:0.6; roughness:0.4" segments-radial="8"></a-cylinder>
+  </a-entity>
+
+  <!-- Ceiling lighting rig (slow rotate) -->
+  <a-torus id="ceiling-rig" radius="16" tube="0.25" position="0 14 0"
+    material="color: #222233; metalness:0.8; roughness:0.3"
+    segments-tubular="32">
+    <a-animation attribute="rotation" from="0 0 0" to="0 360 0" dur="60000" repeat="indefinite" easing="linear"></a-animation>
+  </a-torus>
+  <!-- Rig light orbs -->
+  <a-entity id="rig-orbs">
+    <a-sphere radius="0.3" position=" 16   14   0"  material="color:#ffffff; emissive:#ffffff; emissiveIntensity:1"></a-sphere>
+    <a-sphere radius="0.3" position="-16   14   0"  material="color:#ff00ff; emissive:#ff00ff; emissiveIntensity:1"></a-sphere>
+    <a-sphere radius="0.3" position="  0   14  16"  material="color:#00ffff; emissive:#00ffff; emissiveIntensity:1"></a-sphere>
+    <a-sphere radius="0.3" position="  0   14 -16"  material="color:#ffcc00; emissive:#ffcc00; emissiveIntensity:1"></a-sphere>
+    <a-sphere radius="0.3" position=" 11.3 14  11.3" material="color:#ffffff; emissive:#ffffff; emissiveIntensity:1"></a-sphere>
+    <a-sphere radius="0.3" position="-11.3 14  11.3" material="color:#ff3300; emissive:#ff3300; emissiveIntensity:1"></a-sphere>
+    <a-sphere radius="0.3" position=" 11.3 14 -11.3" material="color:#00ffff; emissive:#00ffff; emissiveIntensity:1"></a-sphere>
+    <a-sphere radius="0.3" position="-11.3 14 -11.3" material="color:#ff00ff; emissive:#ff00ff; emissiveIntensity:1"></a-sphere>
+  </a-entity>
+
+  <!-- ================================================================
+       ENTRANCE APPROACH CORRIDOR (exterior approach, Z: -70 to -45)
+       ================================================================ -->
+  <!-- Side walls of approach corridor -->
+  <a-box width="0.5" height="6" depth="28" position=" 6 3 -57" material="color:#0d0d1f; roughness:0.9"></a-box>
+  <a-box width="0.5" height="6" depth="28" position="-6 3 -57" material="color:#0d0d1f; roughness:0.9"></a-box>
+
+  <!-- ================================================================
+       1. MAIN ENTRANCE PLAZA  (Z: -60 to -45)
+       ================================================================ -->
+  <!-- Floor -->
+  <a-box class="floor" width="14" height="0.1" depth="18" position="0 0 -52"
+    material="color:#1a1a2e; roughness:0.85; metalness:0.1"></a-box>
+
+  <!-- Arch left leg -->
+  <a-box width="1" height="8" depth="1" position="-5 4 -44"
+    material="color:#141428; roughness:0.6; metalness:0.4"></a-box>
+  <!-- Arch right leg -->
+  <a-box width="1" height="8" depth="1" position=" 5 4 -44"
+    material="color:#141428; roughness:0.6; metalness:0.4"></a-box>
+  <!-- Arch lintel -->
+  <a-box width="12" height="1.2" depth="1" position="0 8.4 -44"
+    material="color:#141428; roughness:0.6; metalness:0.4"></a-box>
+  <!-- Neon trim on arch legs -->
+  <a-box width="0.12" height="8" depth="0.12" position="-4.5 4 -43.5" material="color:#ff00ff; emissive:#ff00ff; emissiveIntensity:1.5"></a-box>
+  <a-box width="0.12" height="8" depth="0.12" position=" 4.5 4 -43.5" material="color:#ff00ff; emissive:#ff00ff; emissiveIntensity:1.5"></a-box>
+  <a-box width="12" height="0.12" depth="0.12" position="0 8.9 -43.5"  material="color:#ff00ff; emissive:#ff00ff; emissiveIntensity:1.5"></a-box>
+
+  <!-- ARENA LIVE marquee -->
+  <a-text value="ARENA LIVE" position="0 10 -44" align="center" width="9"
+    material="color:#ff00ff; emissive:#ff00ff; emissiveIntensity:2"
+    color="#ff00ff" font="mozillavr"></a-text>
+
+  <!-- Animated entrance spotlights -->
+  <a-entity position="-4 7 -50">
+    <a-light type="spot" color="#ff00ff" intensity="1.5" angle="20" penumbra="0.5"></a-light>
+    <a-animation attribute="rotation" from="0 0 -20" to="0 0 20" dur="3000" direction="alternate" repeat="indefinite"></a-animation>
+  </a-entity>
+  <a-entity position="4 7 -50">
+    <a-light type="spot" color="#00ffff" intensity="1.5" angle="20" penumbra="0.5"></a-light>
+    <a-animation attribute="rotation" from="0 0 20" to="0 0 -20" dur="3000" direction="alternate" repeat="indefinite"></a-animation>
+  </a-entity>
+
+  <!-- LED Billboards (left and right of entrance) -->
+  <a-plane id="billboard-left" width="4" height="7" position="-9 4.5 -52" rotation="0 25 0"
+    material="color:#ff00ff; emissive:#ff00ff; emissiveIntensity:0.9; roughness:0.2">
+    <a-animation attribute="material.emissive" from="#ff00ff" to="#00ffff" dur="4000" direction="alternate" repeat="indefinite"></a-animation>
+  </a-plane>
+  <a-text value="TONIGHT&#10;ON STAGE" position="0 0 0.01" align="center" width="3.5" color="#ffffff" font="mozillavr"></a-text>
+
+  <a-plane id="billboard-right" width="4" height="7" position=" 9 4.5 -52" rotation="0 -25 0"
+    material="color:#00ffff; emissive:#00ffff; emissiveIntensity:0.9; roughness:0.2">
+    <a-animation attribute="material.emissive" from="#00ffff" to="#ff3300" dur="4000" direction="alternate" repeat="indefinite"></a-animation>
+  </a-plane>
+
+  <!-- Rope stanchions guiding inward -->
+  <a-cylinder radius="0.07" height="1.1" position="-4 0.55 -48" material="color:#999; metalness:0.9; roughness:0.2"></a-cylinder>
+  <a-cylinder radius="0.07" height="1.1" position="-4 0.55 -52" material="color:#999; metalness:0.9; roughness:0.2"></a-cylinder>
+  <a-cylinder radius="0.07" height="1.1" position="-4 0.55 -56" material="color:#999; metalness:0.9; roughness:0.2"></a-cylinder>
+  <a-box width="0.05" height="0.05" depth="8" position="-4 0.85 -52" material="color:#cc0000; emissive:#cc0000; emissiveIntensity:0.6"></a-box>
+  <a-cylinder radius="0.07" height="1.1" position=" 4 0.55 -48" material="color:#999; metalness:0.9; roughness:0.2"></a-cylinder>
+  <a-cylinder radius="0.07" height="1.1" position=" 4 0.55 -52" material="color:#999; metalness:0.9; roughness:0.2"></a-cylinder>
+  <a-cylinder radius="0.07" height="1.1" position=" 4 0.55 -56" material="color:#999; metalness:0.9; roughness:0.2"></a-cylinder>
+  <a-box width="0.05" height="0.05" depth="8" position=" 4 0.85 -52" material="color:#cc0000; emissive:#cc0000; emissiveIntensity:0.6"></a-box>
+
+  <!-- ================================================================
+       2. TICKET BOOKING STAND  (Z: -42 to -36)
+       ================================================================ -->
+  <a-box class="floor" width="14" height="0.1" depth="8" position="0 0 -39"
+    material="color:#151520; roughness:0.9"></a-box>
+
+  <!-- Overhead sign -->
+  <a-text value="TICKET COLLECTION &amp; BOOKING" position="0 5.5 -38" align="center" width="8"
+    color="#ffcc00" font="mozillavr"
+    material="color:#ffcc00; emissive:#ffcc00; emissiveIntensity:1.5"></a-text>
+
+  <!-- Three kiosks -->
+  <!-- Kiosk 1 -->
+  <a-box width="1.2" height="2.5" depth="1" position="-3.5 1.25 -38"
+    material="color:#1c1c30; roughness:0.7; metalness:0.3"></a-box>
+  <a-plane width="0.9" height="0.6" position="-3.5 1.6 -37.51"
+    material="color:#003366; opacity:0.8; transparent:true; emissive:#003366; emissiveIntensity:0.5"></a-plane>
+  <a-text value="TICKET&#10;COUNTER 1" position="-3.5 2.8 -37.9" align="center" width="2" color="#ffcc00" font="mozillavr"></a-text>
+  <a-plane width="0.8" height="0.35" position="-3.5 0.9 -37.51"
+    material="color:#00ff88; emissive:#00ff88; emissiveIntensity:0.8"></a-plane>
+
+  <!-- Kiosk 2 -->
+  <a-box width="1.2" height="2.5" depth="1" position="0 1.25 -38"
+    material="color:#1c1c30; roughness:0.7; metalness:0.3"></a-box>
+  <a-plane width="0.9" height="0.6" position="0 1.6 -37.51"
+    material="color:#003366; opacity:0.8; transparent:true; emissive:#003366; emissiveIntensity:0.5"></a-plane>
+  <a-text value="TICKET&#10;COUNTER 2" position="0 2.8 -37.9" align="center" width="2" color="#ffcc00" font="mozillavr"></a-text>
+  <a-plane width="0.8" height="0.35" position="0 0.9 -37.51"
+    material="color:#00ff88; emissive:#00ff88; emissiveIntensity:0.8"></a-plane>
+
+  <!-- Kiosk 3 -->
+  <a-box width="1.2" height="2.5" depth="1" position=" 3.5 1.25 -38"
+    material="color:#1c1c30; roughness:0.7; metalness:0.3"></a-box>
+  <a-plane width="0.9" height="0.6" position=" 3.5 1.6 -37.51"
+    material="color:#003366; opacity:0.8; transparent:true; emissive:#003366; emissiveIntensity:0.5"></a-plane>
+  <a-text value="TICKET&#10;COUNTER 3" position=" 3.5 2.8 -37.9" align="center" width="2" color="#ffcc00" font="mozillavr"></a-text>
+  <a-plane width="0.8" height="0.35" position=" 3.5 0.9 -37.51"
+    material="color:#00ff88; emissive:#00ff88; emissiveIntensity:0.8"></a-plane>
+
+  <!-- SOLD OUT side panel -->
+  <a-plane width="2.5" height="0.8" position="-6 2.5 -38" rotation="0 30 0"
+    material="color:#ff0000; emissive:#ff0000; emissiveIntensity:1.2">
+  </a-plane>
+  <a-text value="TONIGHT: SOLD OUT" position="-6 2.5 -37.8" rotation="0 30 0" align="center" width="3" color="#ffffff" font="mozillavr"></a-text>
+
+  <!-- Queue lane floor stripes -->
+  <a-box width="0.15" height="0.02" depth="6" position="-1.8 0.06 -39" material="color:#FFD700; emissive:#FFD700; emissiveIntensity:0.5"></a-box>
+  <a-box width="0.15" height="0.02" depth="6" position=" 1.8 0.06 -39" material="color:#FFD700; emissive:#FFD700; emissiveIntensity:0.5"></a-box>
+
+  <!-- ================================================================
+       3. WRISTBAND ZONE  (Z: -34 to -28)
+       ================================================================ -->
+  <a-box class="floor" width="14" height="0.1" depth="8" position="0 0 -31"
+    material="color:#141420; roughness:0.9"></a-box>
+
+  <!-- Overhead sign -->
+  <a-text value="WRISTBAND COLLECTION" position="0 5 -30" align="center" width="7"
+    color="#00ffff" font="mozillavr"
+    material="color:#00ffff; emissive:#00ffff; emissiveIntensity:2">
+  </a-text>
+
+  <!-- Counter table -->
+  <a-box width="10" height="0.12" depth="1" position="0 1.05 -31"
+    material="color:#111122; roughness:0.8">
+    <!-- Cyan edge trim -->
+  </a-box>
+  <a-box width="10" height="0.08" depth="0.06" position="0 1.12 -30.53"
+    material="color:#00ffff; emissive:#00ffff; emissiveIntensity:1.5"></a-box>
+  <a-box width="10" height="1.0" depth="0.9" position="0 0.5 -31"
+    material="color:#1a1a2e; roughness:0.7"></a-box>
+
+  <!-- Wristband tier display behind counter -->
+  <a-box width="10" height="3" depth="0.4" position="0 1.5 -32"
+    material="color:#0d0d1f; roughness:0.9"></a-box>
+  <!-- Gold VIP strips -->
+  <a-box width="1.5" height="0.2" depth="0.1" position="-3 2.2 -31.8" material="color:#ffcc00; emissive:#ffcc00; emissiveIntensity:1"></a-box>
+  <a-box width="1.5" height="0.2" depth="0.1" position="-3 1.9 -31.8" material="color:#ffcc00; emissive:#ffcc00; emissiveIntensity:1"></a-box>
+  <!-- Blue Standard strips -->
+  <a-box width="1.5" height="0.2" depth="0.1" position=" 0 2.2 -31.8" material="color:#2980b9; emissive:#2980b9; emissiveIntensity:1"></a-box>
+  <a-box width="1.5" height="0.2" depth="0.1" position=" 0 1.9 -31.8" material="color:#2980b9; emissive:#2980b9; emissiveIntensity:1"></a-box>
+  <!-- Red Floor strips -->
+  <a-box width="1.5" height="0.2" depth="0.1" position=" 3 2.2 -31.8" material="color:#c0392b; emissive:#c0392b; emissiveIntensity:1"></a-box>
+  <a-box width="1.5" height="0.2" depth="0.1" position=" 3 1.9 -31.8" material="color:#c0392b; emissive:#c0392b; emissiveIntensity:1"></a-box>
+
+  <a-text value="VIP - GOLD  |  STANDARD - BLUE  |  FLOOR - RED"
+    position="-5.5 3.8 -31.5" rotation="0 0 0" align="left" width="5"
+    color="#aaaacc" font="mozillavr"></a-text>
+
+  <!-- Scanner arch (wristband scanner) -->
+  <a-box width="3.2" height="0.3" depth="0.3" position="0 3.2 -28"
+    material="color:#00ffff; emissive:#00ffff; emissiveIntensity:1.2">
+    <a-animation attribute="material.emissiveIntensity" from="0.4" to="1.8" dur="2000" direction="alternate" repeat="indefinite"></a-animation>
+  </a-box>
+  <a-box width="0.3" height="3.2" depth="0.3" position="-1.5 1.6 -28"
+    material="color:#00ffff; emissive:#00ffff; emissiveIntensity:1.2">
+    <a-animation attribute="material.emissiveIntensity" from="0.4" to="1.8" dur="2000" direction="alternate" repeat="indefinite"></a-animation>
+  </a-box>
+  <a-box width="0.3" height="3.2" depth="0.3" position=" 1.5 1.6 -28"
+    material="color:#00ffff; emissive:#00ffff; emissiveIntensity:1.2">
+    <a-animation attribute="material.emissiveIntensity" from="0.4" to="1.8" dur="2000" direction="alternate" repeat="indefinite"></a-animation>
+  </a-box>
+
+  <!-- Floor arrows pointing forward -->
+  <a-box width="0.5" height="0.02" depth="1" position=" 0 0.06 -29" material="color:#FFD700; emissive:#FFD700; emissiveIntensity:0.8">
+    <a-animation attribute="material.opacity" from="0.4" to="1" dur="1500" direction="alternate" repeat="indefinite"></a-animation>
+  </a-box>
+  <a-box width="0.5" height="0.02" depth="1" position=" 2 0.06 -29" material="color:#FFD700; emissive:#FFD700; emissiveIntensity:0.8">
+    <a-animation attribute="material.opacity" from="0.4" to="1" dur="1500" direction="alternate" repeat="indefinite" delay="300"></a-animation>
+  </a-box>
+  <a-box width="0.5" height="0.02" depth="1" position="-2 0.06 -29" material="color:#FFD700; emissive:#FFD700; emissiveIntensity:0.8">
+    <a-animation attribute="material.opacity" from="0.4" to="1" dur="1500" direction="alternate" repeat="indefinite" delay="600"></a-animation>
+  </a-box>
+
+  <!-- ================================================================
+       4. SECURITY CHECKPOINT  (Z: -26 to -18)
+       ================================================================ -->
+  <a-box class="floor" width="14" height="0.1" depth="10" position="0 0 -22"
+    material="color:#111118; roughness:0.9"></a-box>
+
+  <!-- Ceiling sign -->
+  <a-text value="SECURITY CHECKPOINT | PLEASE HAVE ID READY" position="0 5.5 -22" align="center" width="8"
+    color="#ffffff" font="mozillavr"
+    material="color:#ffffff; emissive:#ffffff; emissiveIntensity:1.2"></a-text>
+
+  <!-- Zigzag queue barrier walls -->
+  <a-box width="5" height="0.9" depth="0.12" position="-1.5 0.45 -25"  material="color:#222233; roughness:0.8"></a-box>
+  <a-box width="5" height="0.9" depth="0.12" position=" 1.5 0.45 -23"  material="color:#222233; roughness:0.8"></a-box>
+  <a-box width="5" height="0.9" depth="0.12" position="-1.5 0.45 -21"  material="color:#222233; roughness:0.8"></a-box>
+
+  <!-- 4 Metal detector lanes -->
+  <!-- Lane 1 -->
+  <a-box width="0.15" height="2.8" depth="0.15" position="-4.5 1.4 -19" material="color:#888899; metalness:0.8; roughness:0.3"></a-box>
+  <a-box width="0.15" height="2.8" depth="0.15" position="-3.5 1.4 -19" material="color:#888899; metalness:0.8; roughness:0.3"></a-box>
+  <a-box width="1.15" height="0.15" depth="0.15" position="-4   2.9 -19" material="color:#888899; metalness:0.8; roughness:0.3"></a-box>
+  <a-sphere radius="0.18" position="-4 3.2 -19" material="color:#ff0000; emissive:#ff0000; emissiveIntensity:2">
+    <a-animation attribute="material.color" from="#ff0000" to="#00ff00" dur="3000" direction="alternate" repeat="indefinite"></a-animation>
+    <a-animation attribute="material.emissive" from="#ff0000" to="#00ff00" dur="3000" direction="alternate" repeat="indefinite"></a-animation>
+  </a-sphere>
+
+  <!-- Lane 2 -->
+  <a-box width="0.15" height="2.8" depth="0.15" position="-1.5 1.4 -19" material="color:#888899; metalness:0.8; roughness:0.3"></a-box>
+  <a-box width="0.15" height="2.8" depth="0.15" position="-0.5 1.4 -19" material="color:#888899; metalness:0.8; roughness:0.3"></a-box>
+  <a-box width="1.15" height="0.15" depth="0.15" position="-1   2.9 -19" material="color:#888899; metalness:0.8; roughness:0.3"></a-box>
+  <a-sphere radius="0.18" position="-1 3.2 -19" material="color:#00ff00; emissive:#00ff00; emissiveIntensity:2">
+    <a-animation attribute="material.color" from="#00ff00" to="#ff0000" dur="3000" direction="alternate" repeat="indefinite" delay="1500"></a-animation>
+    <a-animation attribute="material.emissive" from="#00ff00" to="#ff0000" dur="3000" direction="alternate" repeat="indefinite" delay="1500"></a-animation>
+  </a-sphere>
+
+  <!-- Lane 3 -->
+  <a-box width="0.15" height="2.8" depth="0.15" position=" 0.5 1.4 -19" material="color:#888899; metalness:0.8; roughness:0.3"></a-box>
+  <a-box width="0.15" height="2.8" depth="0.15" position=" 1.5 1.4 -19" material="color:#888899; metalness:0.8; roughness:0.3"></a-box>
+  <a-box width="1.15" height="0.15" depth="0.15" position=" 1   2.9 -19" material="color:#888899; metalness:0.8; roughness:0.3"></a-box>
+  <a-sphere radius="0.18" position=" 1 3.2 -19" material="color:#ff0000; emissive:#ff0000; emissiveIntensity:2">
+    <a-animation attribute="material.color" from="#ff0000" to="#00ff00" dur="3000" direction="alternate" repeat="indefinite" delay="750"></a-animation>
+    <a-animation attribute="material.emissive" from="#ff0000" to="#00ff00" dur="3000" direction="alternate" repeat="indefinite" delay="750"></a-animation>
+  </a-sphere>
+
+  <!-- Lane 4 -->
+  <a-box width="0.15" height="2.8" depth="0.15" position=" 3.5 1.4 -19" material="color:#888899; metalness:0.8; roughness:0.3"></a-box>
+  <a-box width="0.15" height="2.8" depth="0.15" position=" 4.5 1.4 -19" material="color:#888899; metalness:0.8; roughness:0.3"></a-box>
+  <a-box width="1.15" height="0.15" depth="0.15" position=" 4   2.9 -19" material="color:#888899; metalness:0.8; roughness:0.3"></a-box>
+  <a-sphere radius="0.18" position=" 4 3.2 -19" material="color:#00ff00; emissive:#00ff00; emissiveIntensity:2">
+    <a-animation attribute="material.color" from="#00ff00" to="#ff0000" dur="3000" direction="alternate" repeat="indefinite" delay="2250"></a-animation>
+    <a-animation attribute="material.emissive" from="#00ff00" to="#ff0000" dur="3000" direction="alternate" repeat="indefinite" delay="2250"></a-animation>
+  </a-sphere>
+
+  <!-- X-ray belt conveyor -->
+  <a-box width="2.5" height="0.6" depth="1" position="5.5 0.3 -22" material="color:#111118; roughness:0.8; metalness:0.5"></a-box>
+  <a-plane width="2" height="0.5" position="5.5 0.61 -22" rotation="-90 0 0"
+    material="color:#0044ff; emissive:#0044ff; emissiveIntensity:0.8"></a-plane>
+  <a-text value="X-RAY" position="5.5 0.62 -22" rotation="-90 0 0" align="center" width="2.5" color="#ffffff" font="mozillavr"></a-text>
+
+  <!-- Security guard placeholders -->
+  <a-cylinder radius="0.2" height="0.9" position="-6 0.45 -20" material="color:#222233; roughness:0.7"></a-cylinder>
+  <a-cone radius-bottom="0.2" radius-top="0.01" height="1.1" position="-6 1.4 -20" material="color:#1a3366; roughness:0.7"></a-cone>
+  <a-cylinder radius="0.2" height="0.9" position=" 6 0.45 -20" material="color:#222233; roughness:0.7"></a-cylinder>
+  <a-cone radius-bottom="0.2" radius-top="0.01" height="1.1" position=" 6 1.4 -20" material="color:#1a3366; roughness:0.7"></a-cone>
+
+  <!-- ================================================================
+       5. CONCOURSE RING  (radius ~30m, Y=0)
+       ================================================================ -->
+  <!-- Concourse floor ring -->
+  <a-ring class="floor"
+    radius-inner="16" radius-outer="31"
+    position="0 0.05 0" rotation="-90 0 0"
+    material="color:#111118; roughness:0.95" segments-theta="32">
+  </a-ring>
+
+  <!-- Concourse inner handrail ring -->
+  <a-torus radius="16.5" tube="0.12" position="0 1.1 0"
+    material="color:#888899; metalness:0.9; roughness:0.2" segments-tubular="32">
+  </a-torus>
+
+  <!-- Wayfinding signs -->
+  <a-text value="SECTIONS A-D  →" position="-25 4 -5" rotation="0 45 0" align="center" width="5"
+    color="#ffffff" font="mozillavr"
+    material="color:#ffffff; emissive:#ffffff; emissiveIntensity:0.8"></a-text>
+  <a-text value="←  SECTIONS E-H" position=" 25 4  5" rotation="0 225 0" align="center" width="5"
+    color="#ffffff" font="mozillavr"
+    material="color:#ffffff; emissive:#ffffff; emissiveIntensity:0.8"></a-text>
+
+  <!-- Welcome sign facing the bowl -->
+  <a-text value="WELCOME TO THE SHOW" position="0 4.5 -17" rotation="0 0 0" align="center" width="7"
+    color="#ffcc00" font="mozillavr"
+    material="color:#ffcc00; emissive:#ffcc00; emissiveIntensity:1.5"></a-text>
+
+  <!-- 8 SECTION TUNNEL PORTALS (every 45 degrees around concourse) -->
+  <!-- Helper: tunnel at angle θ placed at radius ~28, heading inward -->
+
+  <!-- SECTION A  (0°, front = toward entrance) -->
+  <a-entity position="0 0 -28">
+    <a-box width="0.5" height="4" depth="0.5" position="-2 2 0" material="color:#1a1a30; metalness:0.5"></a-box>
+    <a-box width="0.5" height="4" depth="0.5" position=" 2 2 0" material="color:#1a1a30; metalness:0.5"></a-box>
+    <a-box width="4.5" height="0.5" depth="0.5" position="0 4.25 0" material="color:#1a1a30; metalness:0.5"></a-box>
+    <a-text value="SECTION A" position="0 5 0" align="center" width="3.5" color="#ffcc00" font="mozillavr"></a-text>
+    <a-box class="floor" width="3.5" height="0.02" depth="10" position="0 0.02 5" material="color:#111118">
+      <a-animation attribute="material.opacity" from="0.4" to="1" dur="1500" direction="alternate" repeat="indefinite"></a-animation>
+    </a-box>
+  </a-entity>
+
+  <!-- SECTION B  (45°) -->
+  <a-entity position="19.8 0 -19.8" rotation="0 -45 0">
+    <a-box width="0.5" height="4" depth="0.5" position="-2 2 0" material="color:#1a1a30; metalness:0.5"></a-box>
+    <a-box width="0.5" height="4" depth="0.5" position=" 2 2 0" material="color:#1a1a30; metalness:0.5"></a-box>
+    <a-box width="4.5" height="0.5" depth="0.5" position="0 4.25 0" material="color:#1a1a30; metalness:0.5"></a-box>
+    <a-text value="SECTION B" position="0 5 0" align="center" width="3.5" color="#ffcc00" font="mozillavr"></a-text>
+  </a-entity>
+
+  <!-- SECTION C  (90°) -->
+  <a-entity position="28 0 0" rotation="0 -90 0">
+    <a-box width="0.5" height="4" depth="0.5" position="-2 2 0" material="color:#1a1a30; metalness:0.5"></a-box>
+    <a-box width="0.5" height="4" depth="0.5" position=" 2 2 0" material="color:#1a1a30; metalness:0.5"></a-box>
+    <a-box width="4.5" height="0.5" depth="0.5" position="0 4.25 0" material="color:#1a1a30; metalness:0.5"></a-box>
+    <a-text value="SECTION C" position="0 5 0" align="center" width="3.5" color="#ffcc00" font="mozillavr"></a-text>
+  </a-entity>
+
+  <!-- SECTION D  (135°) -->
+  <a-entity position="19.8 0 19.8" rotation="0 -135 0">
+    <a-box width="0.5" height="4" depth="0.5" position="-2 2 0" material="color:#1a1a30; metalness:0.5"></a-box>
+    <a-box width="0.5" height="4" depth="0.5" position=" 2 2 0" material="color:#1a1a30; metalness:0.5"></a-box>
+    <a-box width="4.5" height="0.5" depth="0.5" position="0 4.25 0" material="color:#1a1a30; metalness:0.5"></a-box>
+    <a-text value="SECTION D" position="0 5 0" align="center" width="3.5" color="#ffcc00" font="mozillavr"></a-text>
+  </a-entity>
+
+  <!-- SECTION E  (180°, opposite entrance) -->
+  <a-entity position="0 0 28" rotation="0 180 0">
+    <a-box width="0.5" height="4" depth="0.5" position="-2 2 0" material="color:#1a1a30; metalness:0.5"></a-box>
+    <a-box width="0.5" height="4" depth="0.5" position=" 2 2 0" material="color:#1a1a30; metalness:0.5"></a-box>
+    <a-box width="4.5" height="0.5" depth="0.5" position="0 4.25 0" material="color:#1a1a30; metalness:0.5"></a-box>
+    <a-text value="SECTION E" position="0 5 0" align="center" width="3.5" color="#ffcc00" font="mozillavr"></a-text>
+  </a-entity>
+
+  <!-- SECTION F  (225°) -->
+  <a-entity position="-19.8 0 19.8" rotation="0 225 0">
+    <a-box width="0.5" height="4" depth="0.5" position="-2 2 0" material="color:#1a1a30; metalness:0.5"></a-box>
+    <a-box width="0.5" height="4" depth="0.5" position=" 2 2 0" material="color:#1a1a30; metalness:0.5"></a-box>
+    <a-box width="4.5" height="0.5" depth="0.5" position="0 4.25 0" material="color:#1a1a30; metalness:0.5"></a-box>
+    <a-text value="SECTION F" position="0 5 0" align="center" width="3.5" color="#ffcc00" font="mozillavr"></a-text>
+  </a-entity>
+
+  <!-- SECTION G  (270°) -->
+  <a-entity position="-28 0 0" rotation="0 270 0">
+    <a-box width="0.5" height="4" depth="0.5" position="-2 2 0" material="color:#1a1a30; metalness:0.5"></a-box>
+    <a-box width="0.5" height="4" depth="0.5" position=" 2 2 0" material="color:#1a1a30; metalness:0.5"></a-box>
+    <a-box width="4.5" height="0.5" depth="0.5" position="0 4.25 0" material="color:#1a1a30; metalness:0.5"></a-box>
+    <a-text value="SECTION G" position="0 5 0" align="center" width="3.5" color="#ffcc00" font="mozillavr"></a-text>
+  </a-entity>
+
+  <!-- SECTION H  (315°) -->
+  <a-entity position="-19.8 0 -19.8" rotation="0 315 0">
+    <a-box width="0.5" height="4" depth="0.5" position="-2 2 0" material="color:#1a1a30; metalness:0.5"></a-box>
+    <a-box width="0.5" height="4" depth="0.5" position=" 2 2 0" material="color:#1a1a30; metalness:0.5"></a-box>
+    <a-box width="4.5" height="0.5" depth="0.5" position="0 4.25 0" material="color:#1a1a30; metalness:0.5"></a-box>
+    <a-text value="SECTION H" position="0 5 0" align="center" width="3.5" color="#ffcc00" font="mozillavr"></a-text>
+  </a-entity>
+
+  <!-- Concession stands (between B&C, F&G) -->
+  <a-box width="3" height="1.1" depth="1.5" position="26 0.55 -4"
+    material="color:#1a1a28; roughness:0.8"></a-box>
+  <a-plane width="2.8" height="0.8" position="26 1.4 -3.26" rotation="0 0 0"
+    material="color:#ff6600; emissive:#ff6600; emissiveIntensity:0.9"></a-plane>
+  <a-text value="DRINKS | FOOD" position="26 1.4 -3.2" align="center" width="3.5" color="#ffffff" font="mozillavr"></a-text>
+
+  <a-box width="3" height="1.1" depth="1.5" position="-26 0.55 4"
+    material="color:#1a1a28; roughness:0.8"></a-box>
+  <a-plane width="2.8" height="0.8" position="-26 1.4 4.74" rotation="0 180 0"
+    material="color:#ff6600; emissive:#ff6600; emissiveIntensity:0.9"></a-plane>
+  <a-text value="DRINKS | FOOD" position="-26 1.4 4.8" rotation="0 180 0" align="center" width="3.5" color="#ffffff" font="mozillavr"></a-text>
+
+  <!-- ================================================================
+       6. VIP FLOOR STANDING AREA
+       ================================================================ -->
+  <a-circle class="floor" radius="12" rotation="-90 0 0" position="0 0.08 0"
+    material="color:#111111; roughness:0.95" segments="32">
+  </a-circle>
+  <!-- VIP barrier torus -->
+  <a-torus radius="12.2" tube="0.2" position="0 0.8 0"
+    material="color:#ffcc00; emissive:#ffcc00; emissiveIntensity:0.8; metalness:0.6"
+    segments-tubular="32">
+  </a-torus>
+  <a-text value="FLOOR / VIP ACCESS" position="0 1.5 -12.5" align="center" width="5"
+    color="#ffcc00" font="mozillavr"
+    material="color:#ffcc00; emissive:#ffcc00; emissiveIntensity:1.5"></a-text>
+
+  <!-- ================================================================
+       6b. SEATING — LOWER TIER  (8 sections, red)
+       ================================================================ -->
+  <!-- Using 8 seat-block entities rotated around the bowl -->
+  <!-- Each block: 10 rows x 20 seats approximated as grouped boxes -->
+
+  <a-entity id="lower-tier-seats">
+    <!-- Section at 0deg -->
+    <a-entity rotation="0 0 0">
+      <a-box width="8" height="0.4" depth="5" position="0 1.7 -21"  material="color:#c0392b; roughness:0.8"></a-box>
+      <a-box width="8" height="0.4" depth="5" position="0 2.2 -22.5" material="color:#c0392b; roughness:0.8"></a-box>
+      <a-box width="8" height="0.4" depth="5" position="0 2.7 -24"  material="color:#c0392b; roughness:0.8"></a-box>
+    </a-entity>
+    <a-entity rotation="0 45 0">
+      <a-box width="8" height="0.4" depth="5" position="0 1.7 -21"  material="color:#c0392b; roughness:0.8"></a-box>
+      <a-box width="8" height="0.4" depth="5" position="0 2.2 -22.5" material="color:#c0392b; roughness:0.8"></a-box>
+      <a-box width="8" height="0.4" depth="5" position="0 2.7 -24"  material="color:#c0392b; roughness:0.8"></a-box>
+    </a-entity>
+    <a-entity rotation="0 90 0">
+      <a-box width="8" height="0.4" depth="5" position="0 1.7 -21"  material="color:#c0392b; roughness:0.8"></a-box>
+      <a-box width="8" height="0.4" depth="5" position="0 2.2 -22.5" material="color:#c0392b; roughness:0.8"></a-box>
+      <a-box width="8" height="0.4" depth="5" position="0 2.7 -24"  material="color:#c0392b; roughness:0.8"></a-box>
+    </a-entity>
+    <a-entity rotation="0 135 0">
+      <a-box width="8" height="0.4" depth="5" position="0 1.7 -21"  material="color:#c0392b; roughness:0.8"></a-box>
+      <a-box width="8" height="0.4" depth="5" position="0 2.2 -22.5" material="color:#c0392b; roughness:0.8"></a-box>
+      <a-box width="8" height="0.4" depth="5" position="0 2.7 -24"  material="color:#c0392b; roughness:0.8"></a-box>
+    </a-entity>
+    <a-entity rotation="0 180 0">
+      <a-box width="8" height="0.4" depth="5" position="0 1.7 -21"  material="color:#c0392b; roughness:0.8"></a-box>
+      <a-box width="8" height="0.4" depth="5" position="0 2.2 -22.5" material="color:#c0392b; roughness:0.8"></a-box>
+      <a-box width="8" height="0.4" depth="5" position="0 2.7 -24"  material="color:#c0392b; roughness:0.8"></a-box>
+    </a-entity>
+    <a-entity rotation="0 225 0">
+      <a-box width="8" height="0.4" depth="5" position="0 1.7 -21"  material="color:#c0392b; roughness:0.8"></a-box>
+      <a-box width="8" height="0.4" depth="5" position="0 2.2 -22.5" material="color:#c0392b; roughness:0.8"></a-box>
+      <a-box width="8" height="0.4" depth="5" position="0 2.7 -24"  material="color:#c0392b; roughness:0.8"></a-box>
+    </a-entity>
+    <a-entity rotation="0 270 0">
+      <a-box width="8" height="0.4" depth="5" position="0 1.7 -21"  material="color:#c0392b; roughness:0.8"></a-box>
+      <a-box width="8" height="0.4" depth="5" position="0 2.2 -22.5" material="color:#c0392b; roughness:0.8"></a-box>
+      <a-box width="8" height="0.4" depth="5" position="0 2.7 -24"  material="color:#c0392b; roughness:0.8"></a-box>
+    </a-entity>
+    <a-entity rotation="0 315 0">
+      <a-box width="8" height="0.4" depth="5" position="0 1.7 -21"  material="color:#c0392b; roughness:0.8"></a-box>
+      <a-box width="8" height="0.4" depth="5" position="0 2.2 -22.5" material="color:#c0392b; roughness:0.8"></a-box>
+      <a-box width="8" height="0.4" depth="5" position="0 2.7 -24"  material="color:#c0392b; roughness:0.8"></a-box>
+    </a-entity>
+  </a-entity>
+
+  <!-- UPPER TIER  (blue, elevated) -->
+  <a-entity id="upper-tier-seats">
+    <a-entity rotation="0 0 0">
+      <a-box width="9" height="0.4" depth="5" position="0 6.5 -24"  material="color:#2980b9; roughness:0.8"></a-box>
+      <a-box width="9" height="0.4" depth="5" position="0 7.2 -26"  material="color:#2980b9; roughness:0.8"></a-box>
+      <a-box width="9" height="0.4" depth="5" position="0 7.9 -28"  material="color:#2980b9; roughness:0.8"></a-box>
+    </a-entity>
+    <a-entity rotation="0 45 0">
+      <a-box width="9" height="0.4" depth="5" position="0 6.5 -24"  material="color:#2980b9; roughness:0.8"></a-box>
+      <a-box width="9" height="0.4" depth="5" position="0 7.2 -26"  material="color:#2980b9; roughness:0.8"></a-box>
+      <a-box width="9" height="0.4" depth="5" position="0 7.9 -28"  material="color:#2980b9; roughness:0.8"></a-box>
+    </a-entity>
+    <a-entity rotation="0 90 0">
+      <a-box width="9" height="0.4" depth="5" position="0 6.5 -24"  material="color:#2980b9; roughness:0.8"></a-box>
+      <a-box width="9" height="0.4" depth="5" position="0 7.2 -26"  material="color:#2980b9; roughness:0.8"></a-box>
+      <a-box width="9" height="0.4" depth="5" position="0 7.9 -28"  material="color:#2980b9; roughness:0.8"></a-box>
+    </a-entity>
+    <a-entity rotation="0 135 0">
+      <a-box width="9" height="0.4" depth="5" position="0 6.5 -24"  material="color:#2980b9; roughness:0.8"></a-box>
+      <a-box width="9" height="0.4" depth="5" position="0 7.2 -26"  material="color:#2980b9; roughness:0.8"></a-box>
+      <a-box width="9" height="0.4" depth="5" position="0 7.9 -28"  material="color:#2980b9; roughness:0.8"></a-box>
+    </a-entity>
+    <a-entity rotation="0 180 0">
+      <a-box width="9" height="0.4" depth="5" position="0 6.5 -24"  material="color:#2980b9; roughness:0.8"></a-box>
+      <a-box width="9" height="0.4" depth="5" position="0 7.2 -26"  material="color:#2980b9; roughness:0.8"></a-box>
+      <a-box width="9" height="0.4" depth="5" position="0 7.9 -28"  material="color:#2980b9; roughness:0.8"></a-box>
+    </a-entity>
+    <a-entity rotation="0 225 0">
+      <a-box width="9" height="0.4" depth="5" position="0 6.5 -24"  material="color:#2980b9; roughness:0.8"></a-box>
+      <a-box width="9" height="0.4" depth="5" position="0 7.2 -26"  material="color:#2980b9; roughness:0.8"></a-box>
+      <a-box width="9" height="0.4" depth="5" position="0 7.9 -28"  material="color:#2980b9; roughness:0.8"></a-box>
+    </a-entity>
+    <a-entity rotation="0 270 0">
+      <a-box width="9" height="0.4" depth="5" position="0 6.5 -24"  material="color:#2980b9; roughness:0.8"></a-box>
+      <a-box width="9" height="0.4" depth="5" position="0 7.2 -26"  material="color:#2980b9; roughness:0.8"></a-box>
+      <a-box width="9" height="0.4" depth="5" position="0 7.9 -28"  material="color:#2980b9; roughness:0.8"></a-box>
+    </a-entity>
+    <a-entity rotation="0 315 0">
+      <a-box width="9" height="0.4" depth="5" position="0 6.5 -24"  material="color:#2980b9; roughness:0.8"></a-box>
+      <a-box width="9" height="0.4" depth="5" position="0 7.2 -26"  material="color:#2980b9; roughness:0.8"></a-box>
+      <a-box width="9" height="0.4" depth="5" position="0 7.9 -28"  material="color:#2980b9; roughness:0.8"></a-box>
+    </a-entity>
+  </a-entity>
+
+  <!-- ================================================================
+       7. CENTRAL STAGE
+       ================================================================ -->
+  <!-- Stage platform -->
+  <a-cylinder id="stage-platform" radius="8" height="1.2" position="0 0.6 0"
+    material="color:#111111; roughness:0.85; metalness:0.2" segments-radial="24">
+  </a-cylinder>
+
+  <!-- Stage LED floor -->
+  <a-cylinder class="floor" radius="7.9" height="0.02" position="0 1.22 0"
+    material="color:#ff00ff; emissive:#ff00ff; emissiveIntensity:0.9" segments-radial="24">
+    <a-animation attribute="material.emissive" from="#ff00ff" to="#00ffff" dur="3000" direction="alternate" repeat="indefinite"></a-animation>
+    <a-animation attribute="material.color"    from="#ff00ff" to="#00ffff" dur="3000" direction="alternate" repeat="indefinite"></a-animation>
+  </a-cylinder>
+
+  <!-- Stage catwalk (extending toward entrance) -->
+  <a-box class="floor" width="3" height="1.2" depth="15" position="0 0.6 -15.5"
+    material="color:#111111; roughness:0.85; metalness:0.2">
+  </a-box>
+  <a-box width="3" height="0.02" depth="15" position="0 1.22 -15.5"
+    material="color:#ff00ff; emissive:#ff00ff; emissiveIntensity:0.7">
+    <a-animation attribute="material.emissive" from="#ff00ff" to="#00ffff" dur="3000" direction="alternate" repeat="indefinite"></a-animation>
+  </a-box>
+
+  <!-- 4 Speaker/Truss towers -->
+  <a-box width="1.2" height="16" depth="1.2" position=" 7 8  7" material="color:#1a1a1a; metalness:0.7; roughness:0.3"></a-box>
+  <a-box width="0.1" height="16" depth="0.1" position=" 7.4 8  7.4" material="color:#ff00ff; emissive:#ff00ff; emissiveIntensity:1.2"></a-box>
+  <a-box width="1.2" height="16" depth="1.2" position="-7 8  7" material="color:#1a1a1a; metalness:0.7; roughness:0.3"></a-box>
+  <a-box width="0.1" height="16" depth="0.1" position="-7.4 8  7.4" material="color:#00ffff; emissive:#00ffff; emissiveIntensity:1.2"></a-box>
+  <a-box width="1.2" height="16" depth="1.2" position=" 7 8 -7" material="color:#1a1a1a; metalness:0.7; roughness:0.3"></a-box>
+  <a-box width="0.1" height="16" depth="0.1" position=" 7.4 8 -7.4" material="color:#ffcc00; emissive:#ffcc00; emissiveIntensity:1.2"></a-box>
+  <a-box width="1.2" height="16" depth="1.2" position="-7 8 -7" material="color:#1a1a1a; metalness:0.7; roughness:0.3"></a-box>
+  <a-box width="0.1" height="16" depth="0.1" position="-7.4 8 -7.4" material="color:#ff3300; emissive:#ff3300; emissiveIntensity:1.2"></a-box>
+
+  <!-- Truss rigging crossbeams -->
+  <a-box width="16" height="0.4" depth="0.4" position="0 16 0" material="color:#222222; metalness:0.8; roughness:0.3"></a-box>
+  <a-box width="0.4" height="0.4" depth="16" position="0 16 0" material="color:#222222; metalness:0.8; roughness:0.3"></a-box>
+  <!-- Hanging spot orbs -->
+  <a-sphere radius="0.25" position=" 4 14  0" material="color:#ffffff; emissive:#ffffff; emissiveIntensity:2"></a-sphere>
+  <a-sphere radius="0.25" position="-4 14  0" material="color:#ffcc00; emissive:#ffcc00; emissiveIntensity:2"></a-sphere>
+  <a-sphere radius="0.25" position=" 0 14  4" material="color:#ff00ff; emissive:#ff00ff; emissiveIntensity:2"></a-sphere>
+  <a-sphere radius="0.25" position=" 0 14 -4" material="color:#00ffff; emissive:#00ffff; emissiveIntensity:2"></a-sphere>
+
+  <!-- Giant LED Main Screen (stage rear) -->
+  <a-plane id="main-screen" width="20" height="10" position="0 8 10"
+    material="color:#ff00ff; emissive:#ff00ff; emissiveIntensity:1; roughness:0.1">
+    <a-animation attribute="material.emissive" from="#ff00ff" to="#00ffff" dur="5000" direction="alternate" repeat="indefinite"></a-animation>
+    <a-animation attribute="material.color"    from="#ff00ff" to="#00ffff" dur="5000" direction="alternate" repeat="indefinite"></a-animation>
+  </a-plane>
+  <a-text value="LIVE TONIGHT" position="0 8.5 9.9" align="center" width="10" color="#ffffff" font="mozillavr"></a-text>
+
+  <!-- Side IMAG screens -->
+  <a-plane width="8" height="5" position=" 12 7 7" rotation="0 -45 0"
+    material="color:#00ffff; emissive:#00ffff; emissiveIntensity:1">
+    <a-animation attribute="material.emissive" from="#00ffff" to="#ff00ff" dur="5000" direction="alternate" repeat="indefinite"></a-animation>
+  </a-plane>
+  <a-plane width="8" height="5" position="-12 7 7" rotation="0 45 0"
+    material="color:#ff00ff; emissive:#ff00ff; emissiveIntensity:1">
+    <a-animation attribute="material.emissive" from="#ff00ff" to="#ffcc00" dur="5000" direction="alternate" repeat="indefinite"></a-animation>
+  </a-plane>
+
+  <!-- Laser beams -->
+  <a-cylinder radius="0.04" height="25" position=" 3 13 2"
+    material="color:#ff00ff; emissive:#ff00ff; emissiveIntensity:2; opacity:0.7; transparent:true">
+    <a-animation attribute="rotation" from="0 0 -15" to="0 0 15" dur="4000" direction="alternate" repeat="indefinite"></a-animation>
+  </a-cylinder>
+  <a-cylinder radius="0.04" height="25" position="-3 13 2"
+    material="color:#00ffff; emissive:#00ffff; emissiveIntensity:2; opacity:0.7; transparent:true">
+    <a-animation attribute="rotation" from="0 0 15" to="0 0 -15" dur="6000" direction="alternate" repeat="indefinite"></a-animation>
+  </a-cylinder>
+  <a-cylinder radius="0.04" height="25" position=" 0 13 -2"
+    material="color:#ffcc00; emissive:#ffcc00; emissiveIntensity:2; opacity:0.7; transparent:true">
+    <a-animation attribute="rotation" from="-15 0 0" to="15 0 0" dur="8000" direction="alternate" repeat="indefinite"></a-animation>
+  </a-cylinder>
+  <a-cylinder radius="0.04" height="25" position=" 5 13 -2"
+    material="color:#ff3300; emissive:#ff3300; emissiveIntensity:2; opacity:0.7; transparent:true">
+    <a-animation attribute="rotation" from="0 0 -20" to="0 0 20" dur="5000" direction="alternate" repeat="indefinite"></a-animation>
+  </a-cylinder>
+  <a-cylinder radius="0.04" height="25" position="-5 13 -2"
+    material="color:#ffffff; emissive:#ffffff; emissiveIntensity:2; opacity:0.6; transparent:true">
+    <a-animation attribute="rotation" from="0 0 10" to="0 0 -10" dur="7000" direction="alternate" repeat="indefinite"></a-animation>
+  </a-cylinder>
+
+</a-scene>
+
+<!-- ================================================================
+     CONTROLS + LOADING JS
+     ================================================================ -->
+<script>
+  const scene        = document.querySelector('a-scene');
+  const loadingScreen = document.getElementById('loading-screen');
+  const clickToStart  = document.getElementById('click-to-start');
+  const controlsHint  = document.getElementById('controls-hint');
+  const enterBtn      = document.getElementById('enter-btn');
+
+  // ── Hide loader, show click-to-start ──
+  function onSceneLoaded() {
+    loadingScreen.classList.add('hidden');
+    setTimeout(() => {
+      loadingScreen.style.display = 'none';
+      clickToStart.style.display = 'flex';
+    }, 1200);
+  }
+
+  if (scene.hasLoaded) { onSceneLoaded(); }
+  else { scene.addEventListener('loaded', onSceneLoaded); }
+
+  // ── Enter button dismisses overlay and activates controls ──
+  function startExperience() {
+    clickToStart.style.opacity = '0';
+    clickToStart.style.transition = 'opacity 0.5s';
+    setTimeout(() => { clickToStart.style.display = 'none'; }, 500);
+
+    controlsHint.style.display = 'block';
+    controlsHint.style.opacity = '1';
+
+    // Focus the canvas so keyboard events fire
+    const canvas = scene.canvas;
+    if (canvas) canvas.focus();
+
+    // Auto-hide hint after 6s
+    setTimeout(() => {
+      controlsHint.style.transition = 'opacity 1s';
+      controlsHint.style.opacity = '0';
+      setTimeout(() => { controlsHint.style.display = 'none'; }, 1000);
+    }, 6000);
+  }
+
+  enterBtn.addEventListener('click', startExperience);
+  // Also allow clicking anywhere on the overlay
+  clickToStart.addEventListener('click', function(e) {
+    if (e.target !== enterBtn) startExperience();
+  });
+
+  // ── Arrow key movement (supplement to WASD) ──
+  // A-Frame's wasd-controls already handles WASD.
+  // We add arrow keys manually by simulating movement on the rig.
+  const keys = {};
+  document.addEventListener('keydown', e => { keys[e.code] = true; });
+  document.addEventListener('keyup',   e => { keys[e.code] = false; });
+
+  const SPEED = 0.12;
+  let lastTime = null;
+
+  function tick(timestamp) {
+    if (!lastTime) { lastTime = timestamp; }
+    const delta = (timestamp - lastTime) / 1000;
+    lastTime = timestamp;
+
+    const rig = document.getElementById('rig');
+    const cam = document.getElementById('camera');
+    if (!rig || !cam) { requestAnimationFrame(tick); return; }
+
+    // Get camera's world Y rotation to move relative to look direction
+    const camObj = cam.object3D;
+    const yaw = camObj.rotation.y + rig.object3D.rotation.y;
+
+    let dx = 0, dz = 0;
+    const spd = (keys['ShiftLeft'] || keys['ShiftRight']) ? SPEED * 2.5 : SPEED;
+
+    if (keys['ArrowUp'])    { dx -= Math.sin(yaw) * spd; dz -= Math.cos(yaw) * spd; }
+    if (keys['ArrowDown'])  { dx += Math.sin(yaw) * spd; dz += Math.cos(yaw) * spd; }
+    if (keys['ArrowLeft'])  { dx -= Math.cos(yaw) * spd; dz += Math.sin(yaw) * spd; }
+    if (keys['ArrowRight']) { dx += Math.cos(yaw) * spd; dz -= Math.sin(yaw) * spd; }
+
+    if (dx !== 0 || dz !== 0) {
+      const pos = rig.object3D.position;
+      pos.x += dx;
+      pos.z += dz;
+    }
+
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+
+  // ── Mouse drag look (no pointer lock needed) ──
+  // A-Frame's look-controls handles this natively with mouse drag.
+  // Make sure canvas is clickable.
+  scene.addEventListener('loaded', () => {
+    const canvas = scene.canvas;
+    if (canvas) {
+      canvas.style.cursor = 'grab';
+      canvas.addEventListener('mousedown', () => { canvas.style.cursor = 'grabbing'; });
+      canvas.addEventListener('mouseup',   () => { canvas.style.cursor = 'grab'; });
+    }
+  });
+</script>
+
+</body>
+</html>
