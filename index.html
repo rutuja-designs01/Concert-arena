@@ -9,24 +9,47 @@
       README & HOSTING INSTRUCTIONS:
       1. Save this file as `index.html`.
       2. Host it locally using a secure HTTPS server (WebXR requires HTTPS). 
-         - Easy method: Use Node.js `npx serve -s . --ssl` or `npx local-web-server --https`.
-         - Alternative: Use `ngrok http 8080` to tunnel a local HTTP server to an HTTPS URL.
-         - Cloud method: Upload to GitHub Pages, Vercel, or Glitch.
       3. Open the HTTPS URL in the Meta Quest Browser on your Quest 3.
-      4. Click the "Enter VR" button in the bottom right corner.
     -->
 
-    <!-- A-Frame Core -->
+    <!-- REQUIRED LIBRARIES (Updated to your exact specifications) -->
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+    
+    <!-- THREE.js Compatibility Shim (Crucial for aframe-teleport-controls on A-Frame 1.5.0) -->
+    <script>
+        if (typeof THREE !== 'undefined') {
+            THREE.PlaneBufferGeometry = THREE.PlaneGeometry;
+            THREE.CylinderBufferGeometry = THREE.CylinderGeometry;
+            THREE.RingBufferGeometry = THREE.RingGeometry;
+            THREE.TorusBufferGeometry = THREE.TorusGeometry;
+            THREE.SphereBufferGeometry = THREE.SphereGeometry;
+            
+            if (THREE.BufferAttribute && !THREE.BufferAttribute.prototype.setDynamic) {
+                THREE.BufferAttribute.prototype.setDynamic = function(dynamic) {
+                    this.setUsage(dynamic ? THREE.DynamicDrawUsage : THREE.StaticDrawUsage);
+                    return this;
+                };
+            }
+            if (THREE.BufferGeometry && !THREE.BufferGeometry.prototype.setDynamic) {
+                THREE.BufferGeometry.prototype.setDynamic = function() { return this; };
+            }
+            // Fix for this.geometry.addAttribute is not a function in older teleport-controls
+            if (THREE.BufferGeometry && !THREE.BufferGeometry.prototype.addAttribute) {
+                THREE.BufferGeometry.prototype.addAttribute = function(name, attribute) {
+                    return this.setAttribute(name, attribute);
+                };
+            }
+        }
+    </script>
 
-    <!-- A-Frame Extras (Locomotion, Navmesh) -->
-    <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.2.0/dist/aframe-extras.min.js"></script>
+    <!-- A-Frame Extras (Provides Smooth Locomotion / movement-controls) -->
+    <script src="https://unpkg.com/aframe-extras/dist/aframe-extras.min.js"></script>
     
-    <!-- Blink Controls (Modern Replacement for older Teleport Controls, fully compatible with A-Frame 1.5.0) -->
-    <script src="https://cdn.jsdelivr.net/npm/aframe-blink-controls@0.4.3/dist/aframe-blink-controls.min.js"></script>
+    <!-- Teleport Controls -->
+    <script src="https://unpkg.com/aframe-teleport-controls@0.3.1/dist/aframe-teleport-controls.min.js"></script>
     
-    <!-- Super Hands for interaction mechanics -->
-    <script src="https://unpkg.com/super-hands@3.0.4/dist/super-hands.min.js"></script>
+    <!-- Super Hands (Interaction System) -->
+    <script src="https://unpkg.com/super-hands@4.0.5/dist/super-hands.min.js"></script>
 
     <style>
         body { font-family: sans-serif; background-color: #000; color: #fff; margin: 0; overflow: hidden; }
@@ -39,10 +62,33 @@
             hasTicket: false,
             hasWristband: false,
             securityCleared: false,
-            locomotionMode: 'smooth' // 'smooth' or 'teleport'
+            locomotionMode: 'smooth' 
         };
 
         // --- CUSTOM COMPONENTS ---
+
+        // NEW: Snap Turn Component (Right Thumbstick 30 degrees)
+        AFRAME.registerComponent('snap-turn', {
+            schema: { target: {type: 'selector'}, angle: {type: 'number', default: 30} },
+            init: function() {
+                this.isCooldown = false;
+                this.el.addEventListener('axismove', (e) => {
+                    if (this.isCooldown) return;
+                    const axis = e.detail.axis;
+                    // Check X-axis (horizontal thumbstick)
+                    if (axis[0] > 0.6) { this.rotate(-this.data.angle); }
+                    else if (axis[0] < -0.6) { this.rotate(this.data.angle); }
+                });
+            },
+            rotate: function(angle) {
+                if (!this.data.target) return;
+                this.isCooldown = true;
+                const rot = this.data.target.getAttribute('rotation');
+                this.data.target.setAttribute('rotation', {x: rot.x, y: rot.y + angle, z: rot.z});
+                // Wait before allowing another snap turn
+                setTimeout(() => { this.isCooldown = false; }, 400); 
+            }
+        });
 
         // 1. State Manager & HUD Updater
         AFRAME.registerComponent('app-manager', {
@@ -58,23 +104,24 @@
             }
         });
 
-        // 2. Proximity/Click Interaction for Ticketing
+        // 2. Proximity/Click Interaction for Ticketing (Extended for Super-Hands)
         AFRAME.registerComponent('kiosk-interact', {
             init: function () {
                 const el = this.el;
-                // Listen for controller click or simulated hand pinch
-                el.addEventListener('click', () => {
-                    if (!AppState.hasTicket) {
-                        AppState.hasTicket = true;
-                        el.setAttribute('color', '#00ff00');
-                        el.querySelector('a-text').setAttribute('value', 'TICKET\nISSUED');
-                        
-                        // Play success sound (synthesized for standalone capability)
-                        const osc = new (window.AudioContext || window.webkitAudioContext)().createOscillator();
-                        osc.connect(osc.context.destination);
-                        osc.frequency.value = 600; osc.start(); setTimeout(() => osc.stop(), 200);
-                    }
-                });
+                // Works with both controller click and super-hands grab/pinch
+                el.addEventListener('click', this.handleInteract.bind(this));
+                el.addEventListener('grab-start', this.handleInteract.bind(this));
+            },
+            handleInteract: function() {
+                if (!AppState.hasTicket) {
+                    AppState.hasTicket = true;
+                    this.el.setAttribute('color', '#00ff00');
+                    this.el.querySelector('a-text').setAttribute('value', 'TICKET\nISSUED');
+                    
+                    const osc = new (window.AudioContext || window.webkitAudioContext)().createOscillator();
+                    osc.connect(osc.context.destination);
+                    osc.frequency.value = 600; osc.start(); setTimeout(() => osc.stop(), 200);
+                }
             }
         });
 
@@ -82,55 +129,54 @@
         AFRAME.registerComponent('wristband-interact', {
             init: function () {
                 const el = this.el;
-                el.addEventListener('click', () => {
-                    if (AppState.hasTicket && !AppState.hasWristband) {
-                        AppState.hasWristband = true;
-                        el.setAttribute('color', '#00ff00');
-                        el.querySelector('a-text').setAttribute('value', 'WRISTBAND\nAPPLIED');
-                        
-                        // Attach visual to wrist
-                        document.querySelector('#wristband-visual').setAttribute('visible', 'true');
-                        // Trigger particle burst
-                        const burst = document.querySelector('#wristband-burst');
-                        burst.setAttribute('visible', 'true');
-                        burst.emit('trigger-burst');
-                    } else if (!AppState.hasTicket) {
-                        el.querySelector('a-text').setAttribute('value', 'NEED TICKET\nFIRST');
-                        setTimeout(() => el.querySelector('a-text').setAttribute('value', 'GET\nWRISTBAND'), 2000);
-                    }
-                });
+                el.addEventListener('click', this.handleInteract.bind(this));
+                el.addEventListener('grab-start', this.handleInteract.bind(this));
+            },
+            handleInteract: function() {
+                if (AppState.hasTicket && !AppState.hasWristband) {
+                    AppState.hasWristband = true;
+                    this.el.setAttribute('color', '#00ff00');
+                    this.el.querySelector('a-text').setAttribute('value', 'WRISTBAND\nAPPLIED');
+                    
+                    document.querySelector('#wristband-visual').setAttribute('visible', 'true');
+                    const burst = document.querySelector('#wristband-burst');
+                    burst.setAttribute('visible', 'true');
+                    burst.emit('trigger-burst');
+                } else if (!AppState.hasTicket) {
+                    this.el.querySelector('a-text').setAttribute('value', 'NEED TICKET\nFIRST');
+                    setTimeout(() => this.el.querySelector('a-text').setAttribute('value', 'GET\nWRISTBAND'), 2000);
+                }
             }
         });
 
         // 4. Security Scanner Logic
         AFRAME.registerComponent('security-scanner', {
             init: function () {
-                this.el.addEventListener('click', () => {
-                    const gate = document.querySelector('#security-gate');
-                    const indicator = document.querySelector('#security-indicator');
-                    
-                    if (AppState.hasWristband) {
-                        AppState.securityCleared = true;
-                        indicator.setAttribute('color', '#00ff00');
-                        // Animate gate opening
-                        gate.setAttribute('animation', 'property: position; to: 2 1.5 0; dur: 1000; easing: easeOutQuad');
-                        gate.classList.remove('collidable'); // allow teleport/walking through
-                    } else {
-                        indicator.setAttribute('color', '#ff0000');
-                        // Deny sound
-                        const osc = new (window.AudioContext || window.webkitAudioContext)().createOscillator();
-                        osc.connect(osc.context.destination);
-                        osc.type = 'sawtooth'; osc.frequency.value = 150; osc.start(); setTimeout(() => osc.stop(), 300);
-                    }
-                });
+                this.el.addEventListener('click', this.handleInteract.bind(this));
+                this.el.addEventListener('grab-start', this.handleInteract.bind(this));
+            },
+            handleInteract: function() {
+                const gate = document.querySelector('#security-gate');
+                const indicator = document.querySelector('#security-indicator');
+                
+                if (AppState.hasWristband) {
+                    AppState.securityCleared = true;
+                    indicator.setAttribute('color', '#00ff00');
+                    gate.setAttribute('animation', 'property: position; to: 2 1.5 0; dur: 1000; easing: easeOutQuad');
+                    gate.classList.remove('collidable'); 
+                } else {
+                    indicator.setAttribute('color', '#ff0000');
+                    const osc = new (window.AudioContext || window.webkitAudioContext)().createOscillator();
+                    osc.connect(osc.context.destination);
+                    osc.type = 'sawtooth'; osc.frequency.value = 150; osc.start(); setTimeout(() => osc.stop(), 300);
+                }
             }
         });
 
-        // 5. Hand Tracking Gesture Mapper (Maps WebXR pinch to click events)
+        // 5. Hand Tracking Gesture Mapper (Pinch to Grab/Click mapping for super-hands)
         AFRAME.registerComponent('pinch-to-click', {
             init: function () {
                 this.el.addEventListener('pinchstarted', (evt) => {
-                    // Raycast forward from index finger to intersect interactables
                     const raycaster = this.el.components.raycaster;
                     if (raycaster && raycaster.intersectedEls.length > 0) {
                         const target = raycaster.intersectedEls[0];
@@ -138,7 +184,6 @@
                     }
                 });
                 
-                // Open palm for menu toggle
                 this.el.addEventListener('openpalm', () => {
                     const menu = document.querySelector('#debug-panel');
                     menu.setAttribute('visible', !menu.getAttribute('visible'));
@@ -146,24 +191,21 @@
             }
         });
 
-        // 6. Automated Crowd Instancing (Performance Optimized for Quest 3)
+        // 6. Automated Crowd Instancing 
         AFRAME.registerComponent('instanced-crowd', {
             schema: { count: {type: 'number', default: 500} },
             init: function () {
                 const count = this.data.count;
-                // Simple low-poly geometry for background crowd
                 const geometry = new THREE.CylinderGeometry(0.3, 0.3, 1.6, 6);
                 const material = new THREE.MeshLambertMaterial({color: 0x555555});
                 const mesh = new THREE.InstancedMesh(geometry, material, count);
                 
                 const dummy = new THREE.Object3D();
                 for (let i = 0; i < count; i++) {
-                    // Distribute in a semi-circle behind the stage
                     const angle = Math.random() * Math.PI - (Math.PI / 2);
                     const radius = 15 + Math.random() * 20;
                     dummy.position.set(Math.sin(angle) * radius, 0.8, -10 - Math.cos(angle) * radius);
                     
-                    // Randomize colors slightly for variety
                     const color = new THREE.Color();
                     color.setHSL(Math.random(), 0.7, 0.5);
                     mesh.setColorAt(i, color);
@@ -180,22 +222,20 @@
             init: function() {
                 this.el.addEventListener('click', () => {
                     const rig = document.querySelector('#rig');
-                    // Simple snap to seat logic for demo purposes
                     rig.setAttribute('animation', 'property: position; to: -5 0 -15; dur: 3000; easing: easeInOutQuad');
                 });
+                this.el.addEventListener('grab-start', () => { this.el.emit('click'); });
             }
         });
-
     </script>
 </head>
 <body>
     <div id="debug-overlay">
         <h3>WebXR Arena Demo</h3>
-        <p>Use controllers or hands (pinch to click).</p>
+        <p>Use controllers or hands (pinch/grab to interact).</p>
     </div>
 
     <!-- MAIN SCENE -->
-    <!-- optimized for Quest 3: basic renderer settings, standard lighting -->
     <a-scene 
         app-manager
         webxr="optionalFeatures: hand-tracking, local-floor; referenceSpaceType: local-floor"
@@ -204,61 +244,68 @@
 
         <!-- ASSETS -->
         <a-assets>
-            <a-mixin id="interactive" class="clickable collidable"></a-mixin>
+            <!-- Added hoverable and grabbable for super-hands interactions -->
+            <a-mixin id="interactive" class="clickable collidable" hoverable grabbable></a-mixin>
             <a-mixin id="stanchion" geometry="primitive: cylinder; height: 1; radius: 0.05" material="color: #333"></a-mixin>
-            
-            <!-- Reference Texture Comment -->
-            <!-- REPLACE 'led-placeholder' with the actual texture from the user's uploaded images 
-                 (e.g., "Screenshot 2026-03-06 at 11.17.34 AM.jpg"). The red/orange sweeping LED graphics 
-                 are perfect for the main entrance and stage arches. -->
             <img id="led-placeholder" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVQIW2NkYGD4z8DAwMgAI0AMDA4YAQEX92QAAAAASUVORK5CYII=">
         </a-assets>
 
         <!-- LIGHTING -->
         <a-light type="ambient" color="#222"></a-light>
         <a-light type="directional" position="5 10 -10" intensity="0.5" target="#stage"></a-light>
-        <!-- Stage practical lights -->
         <a-light type="spot" position="0 8 -10" angle="45" color="#ff5500" intensity="2" penumbra="0.5"></a-light>
 
-        <!-- PLAYER RIG & INPUT -->
-        <!-- movement-controls provides smooth locomotion via thumbstick -->
-        <a-entity id="rig" movement-controls="speed: 0.2" position="0 0 18">
-            <a-camera id="head" position="0 1.6 0">
-                <!-- Fallback Cursor for standard browser testing -->
+        <!-- PLAYER RIG & INPUT (Updated to Requested Layout) -->
+        <!-- movement-controls provides smooth locomotion via thumbstick (approx 2 m/s) -->
+        <a-entity id="rig" position="0 0 18" movement-controls="speed: 0.2">
+            
+            <a-entity id="camera" camera position="0 1.6 0" look-controls>
                 <a-entity cursor="rayOrigin: mouse" raycaster="objects: .clickable"></a-entity>
-            </a-camera>
+            </a-entity>
 
-            <!-- HAND TRACKING (Primary) -->
-            <a-entity id="left-hand" hand-tracking-controls="hand: left" pinch-to-click raycaster="objects: .clickable; far: 2" showLine="true">
+            <!-- LEFT CONTROLLER: Laser, Teleport locomotion, and Super-hands -->
+            <a-entity id="leftController"
+                      laser-controls="hand: left"
+                      raycaster="objects: .clickable; far: 5"
+                      teleport-controls="cameraRig: #rig; teleportOrigin: #camera; button: trigger; collisionEntities: .collidable; type: parabolic"
+                      super-hands
+                      sphere-collider="objects: .clickable">
+            </a-entity>
+
+            <!-- RIGHT CONTROLLER: Laser, Snap Turn (30deg), and Super-hands -->
+            <a-entity id="rightController"
+                      laser-controls="hand: right"
+                      raycaster="objects: .clickable; far: 5"
+                      snap-turn="target: #rig; angle: 30"
+                      super-hands
+                      sphere-collider="objects: .clickable">
+            </a-entity>
+
+            <!-- HAND TRACKING - LEFT -->
+            <a-entity hand-tracking-controls="hand: left" pinch-to-click super-hands sphere-collider="objects: .clickable" raycaster="objects: .clickable; far: 2" showLine="true">
                 <!-- Wrist HUD -->
                 <a-entity id="wrist-hud" position="0.05 0.05 0.05" rotation="-90 90 0" scale="0.1 0.1 0.1">
                     <a-plane width="1.5" height="1" color="#111" opacity="0.8"></a-plane>
                     <a-text id="hud-text" value="Status:\nInitializing..." position="-0.65 0.2 0.01" width="3" color="#00ff00"></a-text>
                 </a-entity>
-                
-                <!-- Wristband Visual (Appears after interaction) -->
+                <!-- Wristband Visual -->
                 <a-entity id="wristband-visual" visible="false" position="0 0 0.05" rotation="0 0 0">
                     <a-torus radius="0.04" radius-tubular="0.01" color="#00ffff" material="emissive: #00ffff; emissiveIntensity: 2"></a-torus>
-                    <!-- Particle burst effect -->
                     <a-entity id="wristband-burst" visible="false" animation="property: scale; from: 0.1 0.1 0.1; to: 2 2 2; startEvents: trigger-burst; dur: 500" animation__fade="property: material.opacity; from: 1; to: 0; startEvents: trigger-burst; dur: 500">
                         <a-sphere radius="0.02" color="#fff" material="transparent: true"></a-sphere>
                     </a-entity>
                 </a-entity>
             </a-entity>
-            <a-entity id="right-hand" hand-tracking-controls="hand: right" pinch-to-click raycaster="objects: .clickable; far: 2"></a-entity>
+            
+            <!-- HAND TRACKING - RIGHT -->
+            <a-entity hand-tracking-controls="hand: right" pinch-to-click super-hands sphere-collider="objects: .clickable" raycaster="objects: .clickable; far: 2"></a-entity>
 
-            <!-- CONTROLLER FALLBACK (Secondary) -->
-            <a-entity laser-controls="hand: left" raycaster="objects: .clickable; far: 5" blink-controls="cameraRig: #rig; teleportOrigin: #head; collisionEntities: .collidable"></a-entity>
-            <a-entity laser-controls="hand: right" raycaster="objects: .clickable; far: 5"></a-entity>
         </a-entity>
 
         <!-- SCENE ENVIRONMENT -->
-        
-        <!-- Floor -->
         <a-plane position="0 0 -5" rotation="-90 0 0" width="50" height="50" color="#1a1a1a" class="collidable"></a-plane>
 
         <!-- 1. MAIN ENTRANCE ARCH -->
-        <!-- Modeled after the "Sweet Spot" red/orange concentric rings from the user's images -->
         <a-entity id="main-entrance" position="0 0 12">
             <a-torus radius="4" radius-tubular="0.4" position="0 0 0" color="#ff3300" material="emissive: #ff1100; emissiveIntensity: 0.5" class="collidable"></a-torus>
             <a-torus radius="4.5" radius-tubular="0.2" position="0 0 -1" color="#ff6600" material="emissive: #ff6600; emissiveIntensity: 0.3"></a-torus>
@@ -269,7 +316,6 @@
         <!-- 2. TICKET KIOSK -->
         <a-entity position="-3 0 10" rotation="0 45 0">
             <a-box position="0 0.75 0" width="0.8" height="1.5" depth="0.5" color="#333" class="collidable"></a-box>
-            <!-- Interactive Screen -->
             <a-plane position="0 1.2 0.26" width="0.6" height="0.4" color="#222" mixin="interactive" kiosk-interact>
                 <a-text value="GET\nTICKET" align="center" position="0 0 0.01" width="3" color="#fff"></a-text>
             </a-plane>
@@ -278,7 +324,6 @@
         <!-- 3. WRISTBAND STATION -->
         <a-entity position="3 0 8" rotation="0 -45 0">
             <a-cylinder position="0 0.5 0" radius="0.5" height="1" color="#224" class="collidable"></a-cylinder>
-            <!-- Interactive Top -->
             <a-cylinder position="0 1.05 0" radius="0.4" height="0.1" color="#448" mixin="interactive" wristband-interact>
                 <a-text value="GET\nWRISTBAND" align="center" position="0 0.1 0" rotation="-90 0 0" width="2" color="#fff"></a-text>
             </a-cylinder>
@@ -286,18 +331,15 @@
 
         <!-- 4. SECURITY CHECKPOINT & QUEUE -->
         <a-entity position="0 0 5">
-            <!-- Wall/Barriers -->
             <a-box position="-4 1 0" width="6" height="2" depth="0.2" color="#111" class="collidable"></a-box>
             <a-box position="4 1 0" width="6" height="2" depth="0.2" color="#111" class="collidable"></a-box>
             
-            <!-- Scanner Gate -->
             <a-entity position="-0.5 0 0">
                 <a-box id="security-gate" position="0.5 1.5 0" width="1" height="3" depth="0.1" color="#444" opacity="0.8" mixin="interactive" security-scanner class="collidable"></a-box>
                 <a-sphere id="security-indicator" position="0.5 3.2 0" radius="0.2" color="#ffff00" material="emissive: true"></a-sphere>
                 <a-text value="TAP WRISTBAND" position="0.5 1.5 0.1" align="center" width="2"></a-text>
             </a-entity>
 
-            <!-- Dynamic NPCs in Queue -->
             <a-entity position="-0.5 0 2">
                 <a-cylinder radius="0.3" height="1.6" position="0 0.8 0" color="#555">
                     <a-sphere radius="0.2" position="0 0.9 0" color="#ffccaa"></a-sphere>
@@ -310,37 +352,28 @@
             </a-entity>
         </a-entity>
 
-        <!-- 5. CROWD CONTROL PATHS (Guided Movement) -->
+        <!-- 5. CROWD CONTROL PATHS -->
         <a-entity position="0 0 2">
-            <!-- Glowing path strip on the floor -->
             <a-plane position="-2 0.01 -2" rotation="-90 45 0" width="0.5" height="6" color="#00ffff" material="emissive: #00ffff; emissiveIntensity: 0.5" mixin="interactive" guided-path>
                 <a-text value="FOLLOW TO SEATS" position="0 0.25 0" rotation="0 0 -90" align="center" color="#000" width="4"></a-text>
             </a-plane>
             
-            <!-- Stanchions delineating path -->
             <a-entity mixin="stanchion" position="-1.5 0.5 0"></a-entity>
             <a-entity mixin="stanchion" position="-1.5 0.5 -2"></a-entity>
             <a-entity mixin="stanchion" position="-1.5 0.5 -4"></a-entity>
         </a-entity>
 
         <!-- 6. THE ARENA & CENTRAL STAGE -->
-        <!-- Instanced background crowd -->
         <a-entity instanced-crowd="count: 800"></a-entity>
 
-        <!-- Stage structure mapping to provided visual style -->
         <a-entity id="stage" position="0 0 -15">
             <a-cylinder position="0 0.5 0" radius="6" height="1" color="#111" class="collidable"></a-cylinder>
-            
-            <!-- DJ/Performer Setup -->
             <a-box position="0 1.5 1" width="2" height="1" depth="0.8" color="#222"></a-box>
-            <!-- DJ Dummy -->
             <a-cylinder position="0 2 -0.5" radius="0.3" height="1.6" color="#000"></a-cylinder>
 
-            <!-- Giant LED Rings mimicking the "Sweet Spot" attachment -->
             <a-entity animation="property: rotation; to: 0 0 360; loop: true; dur: 20000; easing: linear">
                 <a-torus radius="5" radius-tubular="0.2" position="0 3 -2" rotation="45 0 0" color="#ff0055" material="emissive: #ff0055; emissiveIntensity: 1"></a-torus>
                 <a-torus radius="6" radius-tubular="0.15" position="0 3 -3" rotation="-45 0 0" color="#00ffcc" material="emissive: #00ffcc; emissiveIntensity: 1"></a-torus>
-                <!-- Animate lighting to simulate beat/music -->
                 <a-light type="point" color="#ff0055" position="0 3 0" distance="15" animation="property: intensity; dir: alternate; from: 0.5; to: 2; dur: 400; loop: true; easing: easeInOutSine"></a-light>
             </a-entity>
         </a-entity>
