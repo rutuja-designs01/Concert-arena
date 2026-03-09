@@ -7,16 +7,44 @@
 
     <!-- Core A-Frame -->
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+
+    <!-- THREE.js Compatibility Shim (Crucial for aframe-teleport-controls on A-Frame 1.5.0) -->
+    <script>
+        if (typeof THREE !== 'undefined') {
+            THREE.PlaneBufferGeometry = THREE.PlaneGeometry;
+            THREE.CylinderBufferGeometry = THREE.CylinderGeometry;
+            THREE.RingBufferGeometry = THREE.RingGeometry;
+            THREE.TorusBufferGeometry = THREE.TorusGeometry;
+            THREE.SphereBufferGeometry = THREE.SphereGeometry;
+            
+            if (THREE.BufferAttribute && !THREE.BufferAttribute.prototype.setDynamic) {
+                THREE.BufferAttribute.prototype.setDynamic = function(dynamic) {
+                    this.setUsage(dynamic ? THREE.DynamicDrawUsage : THREE.StaticDrawUsage);
+                    return this;
+                };
+            }
+            if (THREE.BufferGeometry && !THREE.BufferGeometry.prototype.setDynamic) {
+                THREE.BufferGeometry.prototype.setDynamic = function() { return this; };
+            }
+            if (THREE.BufferGeometry && !THREE.BufferGeometry.prototype.addAttribute) {
+                THREE.BufferGeometry.prototype.addAttribute = function(name, attribute) {
+                    return this.setAttribute(name, attribute);
+                };
+            }
+        }
+    </script>
+
     <!-- Troika text (supports custom .woff fonts; woff2 not supported) -->
     <script src="https://unpkg.com/aframe-troika-text@0.14.0/dist/aframe-troika-text.min.js"></script>
     <!-- Environment (for quick lighting/ground presets) -->
     <script src="https://unpkg.com/aframe-environment-component@1.3.2/dist/aframe-environment-component.min.js"></script>
 
     <!-- Movement / locomotion helpers (movement-controls + teleport-controls) -->
-    <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@6.1.1/dist/aframe-extras.min.js"></script>
+    <script src="https://unpkg.com/aframe-extras/dist/aframe-extras.min.js"></script>
+    <script src="https://unpkg.com/aframe-teleport-controls@0.3.1/dist/aframe-teleport-controls.min.js"></script>
 
     <!-- Super Hands (grabbing / hand interaction events) -->
-    <script src="https://unpkg.com/super-hands@^3.0.0/dist/super-hands.min.js"></script>
+    <script src="https://unpkg.com/super-hands@4.0.5/dist/super-hands.min.js"></script>
 
     <style>
       @font-face {
@@ -197,56 +225,58 @@
         position="0 0 0"
       ></a-circle>
 
-      <!-- Stage at the exact center (360° performance) -->
+      <!-- Stage at the exact center (360° performance) - Brighter Pulse -->
       <a-cylinder
         id="stage"
         position="0 0.5 0"
         radius="4"
         height="1"
         color="#3b1b5c"
-        material="metalness: 0.6; roughness: 0.2; emissive: #471a75; emissiveIntensity: 0.7"
-        animation__pulse="property: material.emissiveIntensity; dir: alternate; from: 0.4; to: 1.1; loop: true; dur: 1800; easing: easeInOutSine"
+        material="metalness: 0.6; roughness: 0.2; emissive: #471a75; emissiveIntensity: 1.5"
+        animation__pulse="property: material.emissiveIntensity; dir: alternate; from: 0.8; to: 2.5; loop: true; dur: 1800; easing: easeInOutSine"
       ></a-cylinder>
 
-      <!-- Holographic ring above the stage -->
+      <!-- BRIGHTER Holographic ring above the stage -->
       <a-torus
-        position="0 3.5 0"
+        position="0 4 0"
         radius="5"
         radius-tubular="0.08"
-        material="color: #22d3ee; emissive: #22d3ee; emissiveIntensity: 0.9; metalness: 0.8; roughness: 0.1; opacity: 0.7; transparent: true"
+        material="color: #22d3ee; emissive: #22d3ee; emissiveIntensity: 2.5; metalness: 0.8; roughness: 0.1; opacity: 0.9; transparent: true"
         animation__spin="property: rotation; to: 0 360 0; loop: true; dur: 14000; easing: linear"
       ></a-torus>
 
+      <!-- NEW: Abstract Shape 1 (Rotating Wireframe Octahedron) -->
+      <a-octahedron
+        position="0 4 0"
+        radius="1.2"
+        material="color: #ec4899; emissive: #ec4899; emissiveIntensity: 3.0; wireframe: true; wireframeLinewidth: 3"
+        animation__spin="property: rotation; to: 360 360 0; loop: true; dur: 8000; easing: linear"
+        animation__float="property: position; dir: alternate; from: 0 3.5 0; to: 0 4.5 0; loop: true; dur: 3000; easing: easeInOutSine"
+      ></a-octahedron>
+
+      <!-- NEW: Abstract Shape 2 (Gyroscopic Outer Torus) -->
+      <a-torus
+        position="0 4 0"
+        radius="4.2"
+        radius-tubular="0.04"
+        material="color: #fb923c; emissive: #fb923c; emissiveIntensity: 2.0; opacity: 0.8; transparent: true"
+        animation__spin="property: rotation; to: 360 0 360; loop: true; dur: 10000; easing: linear"
+      ></a-torus>
+
+      <!-- NEW: Abstract Shape 3 (Floating Glowing Shards) -->
+      <a-entity position="0 4 0" animation__spin="property: rotation; to: 0 -360 0; loop: true; dur: 18000; easing: linear">
+          <a-cone position="2.5 0 0" radius-bottom="0.2" height="1.5" rotation="90 0 0" material="color: #22c55e; emissive: #22c55e; emissiveIntensity: 2.0"></a-cone>
+          <a-cone position="-2.5 0 0" radius-bottom="0.2" height="1.5" rotation="-90 0 0" material="color: #22c55e; emissive: #22c55e; emissiveIntensity: 2.0"></a-cone>
+          <a-cone position="0 0 2.5" radius-bottom="0.2" height="1.5" rotation="0 90 0" material="color: #22c55e; emissive: #22c55e; emissiveIntensity: 2.0"></a-cone>
+          <a-cone position="0 0 -2.5" radius-bottom="0.2" height="1.5" rotation="0 -90 0" material="color: #22c55e; emissive: #22c55e; emissiveIntensity: 2.0"></a-cone>
+      </a-entity>
+
       <!-- Light towers around stage -->
       <a-entity id="stage-rig">
-        <a-box
-          position="4 4 0"
-          depth="0.2"
-          height="8"
-          width="0.2"
-          color="#151515"
-        ></a-box>
-        <a-box
-          position="-4 4 0"
-          depth="0.2"
-          height="8"
-          width="0.2"
-          color="#151515"
-        ></a-box>
-        <a-box
-          position="0 4 4"
-          depth="0.2"
-          height="8"
-          width="0.2"
-          color="#151515"
-        ></a-box>
-        <a-box
-          position="0 4 -4"
-          depth="0.2"
-          height="8"
-          width="0.2"
-          color="#151515"
-        ></a-box>
+        <a-box position="4 4 0" depth="0.2" height="8" width="0.2" color="#151515"></a-box>
+        <a-box position="-4 4 0" depth="0.2" height="8" width="0.2" color="#151515"></a-box>
+        <a-box position="0 4 4" depth="0.2" height="8" width="0.2" color="#151515"></a-box>
+        <a-box position="0 4 -4" depth="0.2" height="8" width="0.2" color="#151515"></a-box>
       </a-entity>
 
       <!-- Simple ringed seating tiers (abstract seats) with labeled quadrants -->
@@ -297,30 +327,10 @@
 
       <!-- Section labels around the bowl -->
       <a-entity id="section-labels">
-        <a-entity
-          position="0 2.4 -15"
-          rotation="0 0 0"
-          class="pb-text"
-          troika-text="value: SECTION A; align: center; maxWidth: 4; fontSize: 0.32; color: #e5e7eb"
-        ></a-entity>
-        <a-entity
-          position="15 2.4 0"
-          rotation="0 -90 0"
-          class="pb-text"
-          troika-text="value: SECTION B; align: center; maxWidth: 4; fontSize: 0.32; color: #e5e7eb"
-        ></a-entity>
-        <a-entity
-          position="0 2.4 15"
-          rotation="0 180 0"
-          class="pb-text"
-          troika-text="value: SECTION C; align: center; maxWidth: 4; fontSize: 0.32; color: #e5e7eb"
-        ></a-entity>
-        <a-entity
-          position="-15 2.4 0"
-          rotation="0 90 0"
-          class="pb-text"
-          troika-text="value: SECTION D; align: center; maxWidth: 4; fontSize: 0.32; color: #e5e7eb"
-        ></a-entity>
+        <a-entity position="0 2.4 -15" rotation="0 0 0" class="pb-text" troika-text="value: SECTION A; align: center; maxWidth: 4; fontSize: 0.32; color: #e5e7eb"></a-entity>
+        <a-entity position="15 2.4 0" rotation="0 -90 0" class="pb-text" troika-text="value: SECTION B; align: center; maxWidth: 4; fontSize: 0.32; color: #e5e7eb"></a-entity>
+        <a-entity position="0 2.4 15" rotation="0 180 0" class="pb-text" troika-text="value: SECTION C; align: center; maxWidth: 4; fontSize: 0.32; color: #e5e7eb"></a-entity>
+        <a-entity position="-15 2.4 0" rotation="0 90 0" class="pb-text" troika-text="value: SECTION D; align: center; maxWidth: 4; fontSize: 0.32; color: #e5e7eb"></a-entity>
       </a-entity>
 
       <!-- Stadium outer bowl and roof structure -->
@@ -355,101 +365,25 @@
         ></a-torus>
 
         <!-- Roof truss ring -->
-        <a-torus
-          position="0 10.5 0"
-          radius="21.5"
-          radius-tubular="0.2"
-          material="color: #111827; metalness: 0.7; roughness: 0.4"
-        ></a-torus>
+        <a-torus position="0 10.5 0" radius="21.5" radius-tubular="0.2" material="color: #111827; metalness: 0.7; roughness: 0.4"></a-torus>
 
         <!-- Vertical structural columns (N/E/S/W) -->
-        <a-box
-          position="0 6 -18"
-          width="0.6"
-          height="12"
-          depth="0.6"
-          color="#111827"
-        ></a-box>
-        <a-box
-          position="18 6 0"
-          width="0.6"
-          height="12"
-          depth="0.6"
-          color="#111827"
-        ></a-box>
-        <a-box
-          position="0 6 18"
-          width="0.6"
-          height="12"
-          depth="0.6"
-          color="#111827"
-        ></a-box>
-        <a-box
-          position="-18 6 0"
-          width="0.6"
-          height="12"
-          depth="0.6"
-          color="#111827"
-        ></a-box>
+        <a-box position="0 6 -18" width="0.6" height="12" depth="0.6" color="#111827"></a-box>
+        <a-box position="18 6 0" width="0.6" height="12" depth="0.6" color="#111827"></a-box>
+        <a-box position="0 6 18" width="0.6" height="12" depth="0.6" color="#111827"></a-box>
+        <a-box position="-18 6 0" width="0.6" height="12" depth="0.6" color="#111827"></a-box>
 
         <!-- Scoreboard over one section -->
-        <a-plane
-          position="0 9 -13"
-          rotation="0 0 0"
-          width="8"
-          height="3"
-          color="#020617"
-          material="metalness: 0.7; roughness: 0.3"
-        ></a-plane>
-        <a-entity
-          position="0 9 -12.99"
-          class="pb-text"
-          troika-text="value: LIVE STADIUM SHOW; align: center; maxWidth: 7.5; fontSize: 0.5; color: #e5e7eb; outlineWidth: 0.006; outlineColor: #000000"
-        ></a-entity>
+        <a-plane position="0 9 -13" rotation="0 0 0" width="8" height="3" color="#020617" material="metalness: 0.7; roughness: 0.3"></a-plane>
+        <a-entity position="0 9 -12.99" class="pb-text" troika-text="value: LIVE STADIUM SHOW; align: center; maxWidth: 7.5; fontSize: 0.5; color: #e5e7eb; outlineWidth: 0.006; outlineColor: #000000"></a-entity>
       </a-entity>
 
       <!-- Color-coded crowd control radial paths leading to seats -->
       <a-entity id="crowd-paths">
-        <!-- North path -->
-        <a-box
-          position="0 0.01 -10"
-          depth="8"
-          height="0.05"
-          width="2"
-          rotation="0 0 0"
-          color="#22c55e"
-          material="opacity: 0.7; emissive: #22c55e; emissiveIntensity: 0.5"
-        ></a-box>
-        <!-- East path -->
-        <a-box
-          position="10 0.01 0"
-          depth="2"
-          height="0.05"
-          width="8"
-          rotation="0 90 0"
-          color="#fb923c"
-          material="opacity: 0.7; emissive: #fb923c; emissiveIntensity: 0.5"
-        ></a-box>
-        <!-- South path (from security gate) -->
-        <a-box
-          position="0 0.01 12"
-          depth="10"
-          height="0.05"
-          width="2"
-          rotation="0 0 0"
-          color="#ec4899"
-          material="opacity: 0.7; emissive: #ec4899; emissiveIntensity: 0.55"
-        ></a-box>
-        <!-- West path -->
-        <a-box
-          position="-10 0.01 0"
-          depth="2"
-          height="0.05"
-          width="8"
-          rotation="0 90 0"
-          color="#d946ef"
-          material="opacity: 0.7; emissive: #d946ef; emissiveIntensity: 0.55"
-        ></a-box>
+        <a-box position="0 0.01 -10" depth="8" height="0.05" width="2" rotation="0 0 0" color="#22c55e" material="opacity: 0.7; emissive: #22c55e; emissiveIntensity: 0.5"></a-box>
+        <a-box position="10 0.01 0" depth="2" height="0.05" width="8" rotation="0 90 0" color="#fb923c" material="opacity: 0.7; emissive: #fb923c; emissiveIntensity: 0.5"></a-box>
+        <a-box position="0 0.01 12" depth="10" height="0.05" width="2" rotation="0 0 0" color="#ec4899" material="opacity: 0.7; emissive: #ec4899; emissiveIntensity: 0.55"></a-box>
+        <a-box position="-10 0.01 0" depth="2" height="0.05" width="8" rotation="0 90 0" color="#d946ef" material="opacity: 0.7; emissive: #d946ef; emissiveIntensity: 0.55"></a-box>
       </a-entity>
 
       <!-- ========================================================= -->
@@ -458,99 +392,44 @@
 
       <!-- MAIN ENTRANCE (pulled further out like a stadium gate) -->
       <a-entity id="entrance-zone" position="0 0 26">
-        <a-entity
-          mixin="zone-floor"
-          position="0 0 0"
-          geometry="primitive: box; width: 14; depth: 6; height: 0.12"
-          material="color: #020617; emissive: #0b1025; emissiveIntensity: 0.25"
-        ></a-entity>
+        <a-entity mixin="zone-floor" position="0 0 0" geometry="primitive: box; width: 14; depth: 6; height: 0.12" material="color: #020617; emissive: #0b1025; emissiveIntensity: 0.25"></a-entity>
+        
+        <!-- Massive Entrance Walls & Pillars -->
+        <a-entity id="massive-entrance-gate">
+          <!-- Giant Pillars -->
+          <a-box position="-6.5 3 0" width="2.5" height="6" depth="2" color="#0a0f1d" material="roughness: 0.9; metalness: 0.1"></a-box>
+          <a-box position="6.5 3 0" width="2.5" height="6" depth="2" color="#0a0f1d" material="roughness: 0.9; metalness: 0.1"></a-box>
+          
+          <!-- Outer flanking walls to make it look even bigger -->
+          <a-box position="-10.5 2.5 0" width="5.5" height="5" depth="1" color="#050812" material="roughness: 0.9; metalness: 0.3"></a-box>
+          <a-box position="10.5 2.5 0" width="5.5" height="5" depth="1" color="#050812" material="roughness: 0.9; metalness: 0.3"></a-box>
 
-        <!-- Entrance arch / gate with neon accents -->
-        <a-entity position="0 2.2 0">
-          <a-box
-            position="0 1 0"
-            width="10"
-            height="0.35"
-            depth="0.4"
-            color="#d946ef"
-            material="emissive: #d946ef; emissiveIntensity: 0.9"
-          ></a-box>
-          <a-box
-            position="-4.6 0 0"
-            width="0.55"
-            height="2.6"
-            depth="0.55"
-            color="#0f172a"
-          ></a-box>
-          <a-box
-            position="4.6 0 0"
-            width="0.55"
-            height="2.6"
-            depth="0.55"
-            color="#0f172a"
-          ></a-box>
-          <!-- Side pillars extended for stadium feel -->
-          <a-box
-            position="-4.6 2.4 0"
-            width="0.4"
-            height="2.2"
-            depth="0.4"
-            color="#ec4899"
-            material="emissive: #ec4899; emissiveIntensity: 0.8"
-          ></a-box>
-          <a-box
-            position="4.6 2.4 0"
-            width="0.4"
-            height="2.2"
-            depth="0.4"
-            color="#22c55e"
-            material="emissive: #22c55e; emissiveIntensity: 0.8"
-          ></a-box>
+          <!-- Massive Crossbar -->
+          <a-box position="0 6.5 0" width="15.5" height="1.5" depth="2.2" color="#050812" material="roughness: 0.9; metalness: 0.2"></a-box>
+          
+          <!-- Neon details -->
+          <a-box position="0 6.5 1.15" width="14" height="0.5" depth="0.1" color="#d946ef" material="emissive: #d946ef; emissiveIntensity: 1.5"></a-box>
+          <a-box position="-6.5 3 1.05" width="0.4" height="5" depth="0.1" color="#ec4899" material="emissive: #ec4899; emissiveIntensity: 1.3"></a-box>
+          <a-box position="6.5 3 1.05" width="0.4" height="5" depth="0.1" color="#22c55e" material="emissive: #22c55e; emissiveIntensity: 1.3"></a-box>
         </a-entity>
 
         <!-- Label -->
-        <a-entity
-          mixin="zone-label"
-          position="0 2.8 0"
-          troika-text="value: STADIUM MAIN ENTRANCE; color: #22c55e; fontSize: 0.42; maxWidth: 7; outlineWidth: 0.006; outlineColor: #000000"
-        ></a-entity>
-        <a-entity
-          position="0 1.2 2"
-          class="pb-text"
-          troika-text="value: START →\nWalk through the gate, then go LEFT for ticket + wristband.; align: center; maxWidth: 6.5; fontSize: 0.26; color: #e5e7eb"
-        ></a-entity>
+        <a-entity mixin="zone-label" position="0 7.8 1.1" troika-text="value: STADIUM MAIN ENTRANCE; color: #22c55e; fontSize: 0.6; maxWidth: 10; outlineWidth: 0.008; outlineColor: #000000"></a-entity>
+        <a-entity position="0 1.2 2" class="pb-text" troika-text="value: START →\nWalk through the gate, then go LEFT for ticket + wristband.; align: center; maxWidth: 6.5; fontSize: 0.26; color: #e5e7eb"></a-entity>
       </a-entity>
 
       <!-- TICKET BOOKING STAND (left of entrance) -->
       <a-entity id="ticket-zone" position="-9 0 22">
-        <a-entity
-          mixin="zone-floor"
-          position="0 0 0"
-          geometry="primitive: box; width: 6.5; depth: 4.5; height: 0.12"
-          material="color: #020617; emissive: #1a0f05; emissiveIntensity: 0.25"
-        ></a-entity>
+        <a-entity mixin="zone-floor" position="0 0 0" geometry="primitive: box; width: 6.5; depth: 4.5; height: 0.12" material="color: #020617; emissive: #1a0f05; emissiveIntensity: 0.25"></a-entity>
 
         <!-- Booth counter -->
-        <a-box
-          position="0 1 0"
-          width="3.4"
-          height="1.6"
-          depth="1.2"
-          color="#020617"
-        ></a-box>
-        <a-box
-          position="0 1.8 0.5"
-          width="3"
-          height="0.6"
-          depth="0.1"
-          color="#fb923c"
-          material="emissive: #fb923c; emissiveIntensity: 0.9"
-        ></a-box>
+        <a-box position="0 1 0" width="3.4" height="1.6" depth="1.2" color="#020617"></a-box>
+        <a-box position="0 1.8 0.5" width="3" height="0.6" depth="0.1" color="#fb923c" material="emissive: #fb923c; emissiveIntensity: 0.9"></a-box>
 
         <!-- Floating master ticket object to grab -->
         <a-box
           id="ticket-item"
-          class="interactive pickup-ticket"
+          class="interactive clickable grabbable pickup-ticket"
           position="0 1.35 0.85"
           width="0.45"
           height="0.24"
@@ -561,591 +440,98 @@
           grabbable
           pickup-ticket
         >
-          <a-entity
-            position="0 0 0.03"
-            class="pb-text"
-            troika-text="value: TICKET; align: center; maxWidth: 1.4; fontSize: 0.22; color: #000000"
-          ></a-entity>
+          <a-entity position="0 0 0.03" class="pb-text" troika-text="value: TICKET; align: center; maxWidth: 1.4; fontSize: 0.22; color: #000000"></a-entity>
         </a-box>
 
         <!-- Four ticket sections: standing / gold / platinum / VIP -->
-        <!-- GREEN standing tickets -->
         <a-entity id="ticket-stack-standing" position="-0.9 1.05 0.1">
-          <a-box
-            width="0.4"
-            height="0.02"
-            depth="0.22"
-            color="#16a34a"
-          ></a-box>
-          <a-box
-            position="0 0.025 0"
-            width="0.4"
-            height="0.02"
-            depth="0.22"
-            color="#22c55e"
-          ></a-box>
-          <a-box
-            position="0 0.05 0"
-            width="0.4"
-            height="0.02"
-            depth="0.22"
-            color="#4ade80"
-          ></a-box>
+          <a-box width="0.4" height="0.02" depth="0.22" color="#16a34a"></a-box>
+          <a-box position="0 0.025 0" width="0.4" height="0.02" depth="0.22" color="#22c55e"></a-box>
+          <a-box position="0 0.05 0" width="0.4" height="0.02" depth="0.22" color="#4ade80"></a-box>
         </a-entity>
-
-        <!-- ORANGE gold seating tickets -->
         <a-entity id="ticket-stack-gold" position="-0.3 1.05 0.1">
-          <a-box
-            width="0.4"
-            height="0.02"
-            depth="0.22"
-            color="#ea580c"
-          ></a-box>
-          <a-box
-            position="0 0.025 0"
-            width="0.4"
-            height="0.02"
-            depth="0.22"
-            color="#fb923c"
-          ></a-box>
-          <a-box
-            position="0 0.05 0"
-            width="0.4"
-            height="0.02"
-            depth="0.22"
-            color="#fed7aa"
-          ></a-box>
+          <a-box width="0.4" height="0.02" depth="0.22" color="#ea580c"></a-box>
+          <a-box position="0 0.025 0" width="0.4" height="0.02" depth="0.22" color="#fb923c"></a-box>
+          <a-box position="0 0.05 0" width="0.4" height="0.02" depth="0.22" color="#fed7aa"></a-box>
         </a-entity>
-
-        <!-- PURPLE platinum tickets -->
         <a-entity id="ticket-stack-platinum" position="0.3 1.05 0.1">
-          <a-box
-            width="0.4"
-            height="0.02"
-            depth="0.22"
-            color="#7e22ce"
-          ></a-box>
-          <a-box
-            position="0 0.025 0"
-            width="0.4"
-            height="0.02"
-            depth="0.22"
-            color="#d946ef"
-          ></a-box>
-          <a-box
-            position="0 0.05 0"
-            width="0.4"
-            height="0.02"
-            depth="0.22"
-            color="#f5d0fe"
-          ></a-box>
+          <a-box width="0.4" height="0.02" depth="0.22" color="#7e22ce"></a-box>
+          <a-box position="0 0.025 0" width="0.4" height="0.02" depth="0.22" color="#d946ef"></a-box>
+          <a-box position="0 0.05 0" width="0.4" height="0.02" depth="0.22" color="#f5d0fe"></a-box>
         </a-entity>
-
-        <!-- RED VIP tickets -->
         <a-entity id="ticket-stack-vip" position="0.9 1.05 0.1">
-          <a-box
-            width="0.4"
-            height="0.02"
-            depth="0.22"
-            color="#b91c1c"
-          ></a-box>
-          <a-box
-            position="0 0.025 0"
-            width="0.4"
-            height="0.02"
-            depth="0.22"
-            color="#ef4444"
-          ></a-box>
-          <a-box
-            position="0 0.05 0"
-            width="0.4"
-            height="0.02"
-            depth="0.22"
-            color="#fecaca"
-          ></a-box>
+          <a-box width="0.4" height="0.02" depth="0.22" color="#b91c1c"></a-box>
+          <a-box position="0 0.025 0" width="0.4" height="0.02" depth="0.22" color="#ef4444"></a-box>
+          <a-box position="0 0.05 0" width="0.4" height="0.02" depth="0.22" color="#fecaca"></a-box>
         </a-entity>
 
         <!-- Label -->
-        <a-entity
-          mixin="zone-label"
-          position="0 2.4 0"
-          troika-text="value: TICKET BOOKING; color: #fb923c; fontSize: 0.38; maxWidth: 5.5; outlineWidth: 0.006; outlineColor: #000000"
-        ></a-entity>
-        <a-entity
-          position="0 0.25 1.8"
-          class="pb-text"
-          troika-text="value: Take your TICKET.\nTicket bundles: GREEN Standing  ORANGE Gold  PURPLE Platinum  RED VIP.; align: center; maxWidth: 5.3; fontSize: 0.22; color: #e5e7eb"
-        ></a-entity>
+        <a-entity mixin="zone-label" position="0 2.4 0" troika-text="value: TICKET BOOKING; color: #fb923c; fontSize: 0.38; maxWidth: 5.5; outlineWidth: 0.006; outlineColor: #000000"></a-entity>
+        <a-entity position="0 0.25 1.8" class="pb-text" troika-text="value: Take your TICKET.\nTicket bundles: GREEN Standing  ORANGE Gold  PURPLE Platinum  RED VIP.; align: center; maxWidth: 5.3; fontSize: 0.22; color: #e5e7eb"></a-entity>
 
         <!-- Neon edge accents -->
-        <a-box
-          position="0 0.07 2.25"
-          width="6.6"
-          height="0.06"
-          depth="0.08"
-          color="#fb923c"
-          material="emissive: #fb923c; emissiveIntensity: 0.9"
-        ></a-box>
-        <a-box
-          position="0 0.07 -2.25"
-          width="6.6"
-          height="0.06"
-          depth="0.08"
-          color="#ec4899"
-          material="emissive: #ec4899; emissiveIntensity: 0.9"
-        ></a-box>
+        <a-box position="0 0.07 2.25" width="6.6" height="0.06" depth="0.08" color="#fb923c" material="emissive: #fb923c; emissiveIntensity: 0.9"></a-box>
+        <a-box position="0 0.07 -2.25" width="6.6" height="0.06" depth="0.08" color="#ec4899" material="emissive: #ec4899; emissiveIntensity: 0.9"></a-box>
       </a-entity>
 
       <!-- WRISTBAND ZONE (inside, right of ticket booking) -->
       <a-entity id="wristband-zone" position="-2.5 0 22">
-        <a-entity
-          mixin="zone-floor"
-          position="0 0 0"
-          geometry="primitive: box; width: 7; depth: 4.5; height: 0.12"
-          material="color: #020617; emissive: #17051a; emissiveIntensity: 0.25"
-        ></a-entity>
+        <a-entity mixin="zone-floor" position="0 0 0" geometry="primitive: box; width: 7; depth: 4.5; height: 0.12" material="color: #020617; emissive: #17051a; emissiveIntensity: 0.25"></a-entity>
 
         <!-- Wristband counter -->
-        <a-box
-          position="0 1 0"
-          width="3"
-          height="1.4"
-          depth="1"
-          color="#020617"
-        ></a-box>
+        <a-box position="0 1 0" width="3" height="1.4" depth="1" color="#020617"></a-box>
 
         <!-- Four wristband types on the stand -->
-        <!-- Green: Standing -->
-        <a-torus
-          id="band-standing"
-          class="interactive"
-          position="-0.9 1.35 0.7"
-          radius="0.16"
-          radius-tubular="0.04"
-          color="#22c55e"
-          material="metalness: 0.6; roughness: 0.25; emissive: #22c55e; emissiveIntensity: 0.6"
-          hoverable
-          pickup-wristband="bandType: standing"
-        ></a-torus>
-        <!-- Orange: Gold seating -->
-        <a-torus
-          id="band-gold"
-          class="interactive"
-          position="-0.3 1.35 0.7"
-          radius="0.16"
-          radius-tubular="0.04"
-          color="#fb923c"
-          material="metalness: 0.6; roughness: 0.25; emissive: #fb923c; emissiveIntensity: 0.7"
-          hoverable
-          pickup-wristband="bandType: gold"
-        ></a-torus>
-        <!-- Purple: Platinum seating -->
-        <a-torus
-          id="band-platinum"
-          class="interactive"
-          position="0.3 1.35 0.7"
-          radius="0.16"
-          radius-tubular="0.04"
-          color="#d946ef"
-          material="metalness: 0.6; roughness: 0.25; emissive: #d946ef; emissiveIntensity: 0.75"
-          hoverable
-          pickup-wristband="bandType: platinum"
-        ></a-torus>
-        <!-- Red: VIP seating -->
-        <a-torus
-          id="band-vip"
-          class="interactive"
-          position="0.9 1.35 0.7"
-          radius="0.16"
-          radius-tubular="0.04"
-          color="#ef4444"
-          material="metalness: 0.6; roughness: 0.25; emissive: #ef4444; emissiveIntensity: 0.7"
-          hoverable
-          pickup-wristband="bandType: vip"
-        ></a-torus>
+        <a-torus id="band-standing" class="interactive clickable grabbable" position="-0.9 1.35 0.7" radius="0.16" radius-tubular="0.04" color="#22c55e" material="metalness: 0.6; roughness: 0.25; emissive: #22c55e; emissiveIntensity: 0.6" hoverable pickup-wristband="bandType: standing"></a-torus>
+        <a-torus id="band-gold" class="interactive clickable grabbable" position="-0.3 1.35 0.7" radius="0.16" radius-tubular="0.04" color="#fb923c" material="metalness: 0.6; roughness: 0.25; emissive: #fb923c; emissiveIntensity: 0.7" hoverable pickup-wristband="bandType: gold"></a-torus>
+        <a-torus id="band-platinum" class="interactive clickable grabbable" position="0.3 1.35 0.7" radius="0.16" radius-tubular="0.04" color="#d946ef" material="metalness: 0.6; roughness: 0.25; emissive: #d946ef; emissiveIntensity: 0.75" hoverable pickup-wristband="bandType: platinum"></a-torus>
+        <a-torus id="band-vip" class="interactive clickable grabbable" position="0.9 1.35 0.7" radius="0.16" radius-tubular="0.04" color="#ef4444" material="metalness: 0.6; roughness: 0.25; emissive: #ef4444; emissiveIntensity: 0.7" hoverable pickup-wristband="bandType: vip"></a-torus>
 
         <!-- Label -->
-        <a-entity
-          mixin="zone-label"
-          position="0 2.4 0"
-          troika-text="value: WRISTBAND STATION; color: #d946ef; fontSize: 0.38; maxWidth: 6; outlineWidth: 0.006; outlineColor: #000000"
-        ></a-entity>
-        <a-entity
-          position="0 0.25 1.8"
-          class="pb-text"
-          troika-text="value: Pinch (right hand) or click a band:\nGREEN=Standing  ORANGE=Gold  PURPLE=Platinum  RED=VIP; align: center; maxWidth: 6.5; fontSize: 0.22; color: #e5e7eb"
-        ></a-entity>
+        <a-entity mixin="zone-label" position="0 2.4 0" troika-text="value: WRISTBAND STATION; color: #d946ef; fontSize: 0.38; maxWidth: 6; outlineWidth: 0.006; outlineColor: #000000"></a-entity>
+        <a-entity position="0 0.25 1.8" class="pb-text" troika-text="value: Pinch (right hand) or click a band:\nGREEN=Standing  ORANGE=Gold  PURPLE=Platinum  RED=VIP; align: center; maxWidth: 6.5; fontSize: 0.22; color: #e5e7eb"></a-entity>
 
         <!-- Neon edge accents -->
-        <a-box
-          position="0 0.07 2.25"
-          width="7.1"
-          height="0.06"
-          depth="0.08"
-          color="#d946ef"
-          material="emissive: #d946ef; emissiveIntensity: 0.9"
-        ></a-box>
-        <a-box
-          position="0 0.07 -2.25"
-          width="7.1"
-          height="0.06"
-          depth="0.08"
-          color="#22c55e"
-          material="emissive: #22c55e; emissiveIntensity: 0.9"
-        ></a-box>
+        <a-box position="0 0.07 2.25" width="7.1" height="0.06" depth="0.08" color="#d946ef" material="emissive: #d946ef; emissiveIntensity: 0.9"></a-box>
+        <a-box position="0 0.07 -2.25" width="7.1" height="0.06" depth="0.08" color="#22c55e" material="emissive: #22c55e; emissiveIntensity: 0.9"></a-box>
       </a-entity>
 
       <!-- SECURITY CHECK & QUEUE (gate leading into arena) -->
       <a-entity id="security-zone" position="0 0 15" scale="1.6 1.6 1.6">
-        <!-- Queue lanes (crowd control) -->
-        <a-box
-          position="-1.2 0.01 1"
-          width="0.4"
-          height="0.05"
-          depth="4"
-          color="#d946ef"
-          material="opacity: 0.8; emissive: #d946ef; emissiveIntensity: 0.5"
-        ></a-box>
-        <a-box
-          position="0 0.01 1"
-          width="0.4"
-          height="0.05"
-          depth="4"
-          color="#ec4899"
-          material="opacity: 0.8; emissive: #ec4899; emissiveIntensity: 0.5"
-        ></a-box>
-        <a-box
-          position="1.2 0.01 1"
-          width="0.4"
-          height="0.05"
-          depth="4"
-          color="#22c55e"
-          material="opacity: 0.8; emissive: #22c55e; emissiveIntensity: 0.5"
-        ></a-box>
-
-        <!-- Vertical queue poles -->
-        <a-entity id="queue-poles">
-          <a-cylinder
-            position="-1.2 0.6 -1"
-            radius="0.05"
-            height="1.2"
-            color="#0f172a"
-            material="emissive: #ec4899; emissiveIntensity: 0.25"
-          ></a-cylinder>
-          <a-cylinder
-            position="-1.2 0.6 1"
-            radius="0.05"
-            height="1.2"
-            color="#0f172a"
-            material="emissive: #d946ef; emissiveIntensity: 0.25"
-          ></a-cylinder>
-          <a-cylinder
-            position="0 0.6 -1"
-            radius="0.05"
-            height="1.2"
-            color="#0f172a"
-            material="emissive: #22c55e; emissiveIntensity: 0.25"
-          ></a-cylinder>
-          <a-cylinder
-            position="0 0.6 1"
-            radius="0.05"
-            height="1.2"
-            color="#0f172a"
-            material="emissive: #fb923c; emissiveIntensity: 0.25"
-          ></a-cylinder>
-          <a-cylinder
-            position="1.2 0.6 -1"
-            radius="0.05"
-            height="1.2"
-            color="#0f172a"
-            material="emissive: #ec4899; emissiveIntensity: 0.25"
-          ></a-cylinder>
-          <a-cylinder
-            position="1.2 0.6 1"
-            radius="0.05"
-            height="1.2"
-            color="#0f172a"
-            material="emissive: #fb923c; emissiveIntensity: 0.25"
-          ></a-cylinder>
-        </a-entity>
-
-        <!-- Stanchion belts (animated neon ribbons) -->
-        <a-entity id="stanchion-belts" position="0 0 0">
-          <!-- Back row belts -->
-          <a-box
-            position="-0.6 0.9 -1"
-            width="1.2"
-            height="0.06"
-            depth="0.04"
-            color="#ec4899"
-            material="emissive: #ec4899; emissiveIntensity: 0.9"
-            animation__glow="property: material.emissiveIntensity; dir: alternate; from: 0.4; to: 1.1; loop: true; dur: 900; easing: easeInOutSine"
-          ></a-box>
-          <a-box
-            position="0.6 0.9 -1"
-            width="1.2"
-            height="0.06"
-            depth="0.04"
-            color="#d946ef"
-            material="emissive: #d946ef; emissiveIntensity: 0.9"
-            animation__glow="property: material.emissiveIntensity; dir: alternate; from: 0.4; to: 1.1; loop: true; dur: 1000; easing: easeInOutSine"
-          ></a-box>
-          <!-- Front row belts -->
-          <a-box
-            position="-0.6 0.9 1"
-            width="1.2"
-            height="0.06"
-            depth="0.04"
-            color="#fb923c"
-            material="emissive: #fb923c; emissiveIntensity: 0.9"
-            animation__glow="property: material.emissiveIntensity; dir: alternate; from: 0.4; to: 1.1; loop: true; dur: 820; easing: easeInOutSine"
-          ></a-box>
-          <a-box
-            position="0.6 0.9 1"
-            width="1.2"
-            height="0.06"
-            depth="0.04"
-            color="#22c55e"
-            material="emissive: #22c55e; emissiveIntensity: 0.9"
-            animation__glow="property: material.emissiveIntensity; dir: alternate; from: 0.4; to: 1.1; loop: true; dur: 880; easing: easeInOutSine"
-          ></a-box>
-        </a-entity>
+        <!-- Two long lines for queue -->
+        <a-box position="-1.2 0.5 2" width="0.1" height="1" depth="6" color="#ef4444" material="emissive: #ef4444; emissiveIntensity: 0.3"></a-box>
+        <a-box position="1.2 0.5 2" width="0.1" height="1" depth="6" color="#ef4444" material="emissive: #ef4444; emissiveIntensity: 0.3"></a-box>
 
         <!-- Security gate -->
         <a-entity id="security-gate-root" position="0 0 0" security-gate>
+          <!-- Red entrance frame -->
+          <a-box position="-1.5 1.5 -0.5" width="0.4" height="3" depth="0.4" color="#991b1b"></a-box>
+          <a-box position="1.5 1.5 -0.5" width="0.4" height="3" depth="0.4" color="#991b1b"></a-box>
+          <a-box position="0 3.1 -0.5" width="3.4" height="0.4" depth="0.4" color="#991b1b"></a-box>
+
+          <!-- The gate block itself -->
           <a-box
             id="security-gate"
-            position="0 2 -1.4"
-            width="5"
-            height="2.6"
-            depth="0.15"
-            color="#ec4899"
-            material="emissive: #ec4899; emissiveIntensity: 0.75"
+            class="interactive clickable grabbable"
+            position="0 1.5 -0.5"
+            width="2.6"
+            height="2.8"
+            depth="0.1"
+            color="#ef4444"
+            material="emissive: #ef4444; emissiveIntensity: 0.6"
             hoverable
           ></a-box>
-          <a-entity
-            id="security-label"
-            position="0 3.4 -1.4"
-            mixin="zone-label"
-            troika-text="value: SECURITY CHECK; color: #ec4899; fontSize: 0.38; maxWidth: 5.5; outlineWidth: 0.006; outlineColor: #000000"
-          ></a-entity>
+          <a-entity id="security-label" position="0 3.6 -0.5" mixin="zone-label" troika-text="value: SECURITY CHECK; color: #ef4444; fontSize: 0.38; maxWidth: 5.5; outlineWidth: 0.006; outlineColor: #000000"></a-entity>
         </a-entity>
-
-        <!-- Metal detector frames x4 (one per lane) -->
-        <a-entity id="metal-detectors">
-          <a-box
-            position="-1.5 1.7 -0.2"
-            width="0.3"
-            height="3.2"
-            depth="0.3"
-            color="#1f2937"
-          ></a-box>
-          <a-box
-            position="-0.9 1.7 -0.2"
-            width="0.3"
-            height="3.2"
-            depth="0.3"
-            color="#1f2937"
-          ></a-box>
-
-          <a-box
-            position="-0.5 1.7 -0.2"
-            width="0.3"
-            height="3.2"
-            depth="0.3"
-            color="#1f2937"
-          ></a-box>
-          <a-box
-            position="0.1 1.7 -0.2"
-            width="0.3"
-            height="3.2"
-            depth="0.3"
-            color="#1f2937"
-          ></a-box>
-
-          <a-box
-            position="0.5 1.7 -0.2"
-            width="0.3"
-            height="3.2"
-            depth="0.3"
-            color="#1f2937"
-          ></a-box>
-          <a-box
-            position="1.1 1.7 -0.2"
-            width="0.3"
-            height="3.2"
-            depth="0.3"
-            color="#1f2937"
-          ></a-box>
-
-          <!-- top beams -->
-          <a-box
-            position="-1.2 3.2 -0.2"
-            width="0.9"
-            height="0.25"
-            depth="0.3"
-            color="#111827"
-          ></a-box>
-          <a-box
-            position="-0.2 3.2 -0.2"
-            width="0.9"
-            height="0.25"
-            depth="0.3"
-            color="#111827"
-          ></a-box>
-          <a-box
-            position="0.8 3.2 -0.2"
-            width="0.9"
-            height="0.25"
-            depth="0.3"
-            color="#111827"
-          ></a-box>
-        </a-entity>
-
-        <!-- Indicator light spheres x4 (animated red/green) -->
-        <a-entity id="metal-indicators">
-          <a-sphere
-            position="-1.2 3.5 -0.15"
-            radius="0.12"
-            color="#22c55e"
-            material="emissive: #22c55e; emissiveIntensity: 0.9"
-            animation__blink="property: material.emissiveIntensity; dir: alternate; from: 0.4; to: 1.0; dur: 900; loop: true; easing: easeInOutSine"
-          ></a-sphere>
-          <a-sphere
-            position="-0.2 3.5 -0.15"
-            radius="0.12"
-            color="#22c55e"
-            material="emissive: #22c55e; emissiveIntensity: 0.9"
-            animation__blink="property: material.emissiveIntensity; dir: alternate; from: 0.4; to: 1.0; dur: 1000; loop: true; easing: easeInOutSine"
-          ></a-sphere>
-          <a-sphere
-            position="0.8 3.5 -0.15"
-            radius="0.12"
-            color="#22c55e"
-            material="emissive: #22c55e; emissiveIntensity: 0.9"
-            animation__blink="property: material.emissiveIntensity; dir: alternate; from: 0.4; to: 1.0; dur: 1100; loop: true; easing: easeInOutSine"
-          ></a-sphere>
-          <a-sphere
-            position="0 3.8 -0.3"
-            radius="0.13"
-            color="#ef4444"
-            material="emissive: #ef4444; emissiveIntensity: 0.9"
-            animation__blink="property: material.emissiveIntensity; dir: alternate; from: 0.4; to: 1.0; dur: 750; loop: true; easing: easeInOutSine"
-          ></a-sphere>
-        </a-entity>
-
-        <!-- Zigzag queue barriers x3 -->
-        <a-entity id="zigzag-barriers">
-          <a-box
-            position="0 0.5 0.3"
-            width="2.6"
-            height="0.08"
-            depth="0.08"
-            color="#ec4899"
-            material="emissive: #ec4899; emissiveIntensity: 0.8"
-          ></a-box>
-          <a-box
-            position="0 0.5 0.9"
-            width="2.6"
-            height="0.08"
-            depth="0.08"
-            color="#fb923c"
-            material="emissive: #fb923c; emissiveIntensity: 0.8"
-          ></a-box>
-          <a-box
-            position="0 0.5 1.5"
-            width="2.6"
-            height="0.08"
-            depth="0.08"
-            color="#22c55e"
-            material="emissive: #22c55e; emissiveIntensity: 0.8"
-          ></a-box>
-        </a-entity>
-
-        <!-- X-ray belt machine and screen -->
-        <a-entity id="xray-zone" position="0 0 -2.4">
-          <a-box
-            position="0 0.8 0"
-            width="3"
-            height="0.6"
-            depth="1"
-            color="#111827"
-          ></a-box>
-          <a-box
-            position="0 1.2 0.35"
-            width="1.4"
-            height="1.2"
-            depth="0.2"
-            color="#020617"
-          ></a-box>
-          <!-- Belt surface -->
-          <a-box
-            position="0 1.05 0"
-            width="2.8"
-            height="0.08"
-            depth="0.9"
-            color="#4b5563"
-            material="emissive: #4b5563; emissiveIntensity: 0.2"
-          ></a-box>
-          <!-- Screen label -->
-          <a-entity
-            position="0 1.6 0.45"
-            class="pb-text"
-            troika-text="value: X-RAY SCREEN; align: center; maxWidth: 2.4; fontSize: 0.25; color: #22c55e"
-          ></a-entity>
-        </a-entity>
-
-        <!-- Guard position markers (cone silhouettes) -->
-        <a-entity id="guards">
-          <a-cone
-            position="-1.8 0.5 -0.4"
-            radius-bottom="0.35"
-            radius-top="0.05"
-            height="1"
-            color="#020617"
-            material="emissive: #fb923c; emissiveIntensity: 0.5"
-          ></a-cone>
-          <a-cone
-            position="1.8 0.5 -0.4"
-            radius-bottom="0.35"
-            radius-top="0.05"
-            height="1"
-            color="#020617"
-            material="emissive: #22c55e; emissiveIntensity: 0.5"
-          ></a-cone>
-        </a-entity>
-
-        <!-- SECURITY ceiling sign -->
-        <a-entity
-          position="0 4.0 -0.4"
-          class="pb-text"
-          troika-text="value: SECURITY; align: center; maxWidth: 5; fontSize: 0.5; color: #ffffff; outlineWidth: 0.01; outlineColor: #000000"
-        ></a-entity>
 
         <!-- Helper text facing the queue -->
-        <a-entity
-          position="0 1.3 1.5"
-          class="pb-text"
-          troika-text="value: QUEUE HERE WITH TICKET + WRISTBAND; align: center; maxWidth: 7; fontSize: 0.24; color: #e5e7eb"
-        ></a-entity>
+        <a-entity position="0 1.3 2.5" class="pb-text" troika-text="value: QUEUE HERE WITH TICKET + WRISTBAND; align: center; maxWidth: 7; fontSize: 0.24; color: #e5e7eb"></a-entity>
       </a-entity>
 
       <!-- Simple persona that joins the queue after wristband selection -->
       <a-entity id="persona" visible="false" persona-queue>
-        <a-cylinder
-          id="persona-body"
-          position="0 0.55 0"
-          radius="0.18"
-          height="1.1"
-          color="#22c55e"
-          material="emissive: #22c55e; emissiveIntensity: 0.35"
-        ></a-cylinder>
-        <a-sphere
-          position="0 1.25 0"
-          radius="0.18"
-          color="#c8a27a"
-          material="roughness: 0.9"
-        ></a-sphere>
+        <a-cylinder id="persona-body" position="0 0.55 0" radius="0.18" height="1.1" color="#22c55e" material="emissive: #22c55e; emissiveIntensity: 0.35"></a-cylinder>
+        <a-sphere position="0 1.25 0" radius="0.18" color="#c8a27a" material="roughness: 0.9"></a-sphere>
       </a-entity>
 
       <!-- ========================================================= -->
@@ -1154,129 +540,127 @@
 
       <!-- Player rig starts in front of the main entrance -->
       <a-entity
-        id="player-rig"
+        id="rig"
         position="0 0 32"
-        movement-controls="speed: 1.2; fly: false; easingY: 15"
-        wasd-controls="acceleration: 18"
+        movement-controls="speed: 0.6; fly: false; easingY: 15"
         player-state
         control-profile="mode: desktop"
       >
         <!-- VR camera -->
         <a-entity
-          id="player-camera"
+          id="camera"
           camera
           position="0 1.6 0"
           look-controls="pointerLockEnabled: true"
         >
-          <!-- Reticle + cursor in the center of view -->
+          <!-- Reticle + cursor in the center of view for Desktop mode -->
           <a-entity
             id="desktop-reticle"
             cursor="fuse: false; rayOrigin: entity"
-            raycaster="objects: .interactive"
+            raycaster="objects: .interactive, .clickable"
             position="0 0 -1"
             geometry="primitive: ring; radiusInner: 0.01; radiusOuter: 0.017"
             material="color: #ffffff; opacity: 0.9"
           ></a-entity>
         </a-entity>
 
-        <!-- Teleport controls for comfort locomotion on supported devices -->
+        <!-- LEFT CONTROLLER: Teleport + Laser + Super Hands -->
         <a-entity
-          id="teleport-controls"
-          teleport-controls="cameraRig: #player-rig; teleportOrigin: #player-camera; collisionEntities: #arena-floor, #crowd-paths, #entrance-zone, #ticket-zone, #wristband-zone, #security-zone; button: trigger;"
-          raycaster="objects: #arena-floor, #crowd-paths"
-        ></a-entity>
+          id="leftController"
+          laser-controls="hand: left"
+          raycaster="objects: .interactive, .clickable"
+          teleport-controls="cameraRig: #rig; teleportOrigin: #camera; collisionEntities: #arena-floor, #crowd-paths, #entrance-zone, #ticket-zone, #wristband-zone, #security-zone; button: trigger; type: parabolic"
+          super-hands="colliderEvent: raycaster-intersection; colliderEventProperty: els; colliderEndEvent:raycaster-intersection-cleared; colliderEndEventProperty: clearedEls;">
+        </a-entity>
 
-        <!-- Hand tracking entities (Meta Quest 3) -->
+        <!-- RIGHT CONTROLLER: Snap Turn + Laser + Super Hands -->
+        <a-entity
+          id="rightController"
+          laser-controls="hand: right"
+          raycaster="objects: .interactive, .clickable"
+          snap-turn="target: #rig; angle: 30"
+          super-hands="colliderEvent: raycaster-intersection; colliderEventProperty: els; colliderEndEvent:raycaster-intersection-cleared; colliderEndEventProperty: clearedEls;">
+        </a-entity>
+
+        <!-- HAND TRACKING - LEFT -->
         <a-entity
           id="left-hand"
           hand-tracking-controls="hand: left; modelColor: #5dd6ff"
           super-hands="colliderEvent: hitstart; colliderEventProperty: els; colliderEndEvent: hitend;"
+          sphere-collider="objects: .interactive, .clickable; radius: 0.03"
+          pinch-to-click
         ></a-entity>
 
+        <!-- HAND TRACKING - RIGHT -->
         <a-entity
           id="right-hand"
           hand-tracking-controls="hand: right; modelColor: #ff6fb1"
           super-hands="colliderEvent: hitstart; colliderEventProperty: els; colliderEndEvent: hitend;"
+          sphere-collider="objects: .interactive, .clickable; radius: 0.03"
           right-hand-pinch-selector="targets: [pickup-wristband]; maxDistance: 0.28"
+          pinch-to-click
         ></a-entity>
       </a-entity>
 
       <!-- Floating status board inside arena -->
-      <a-entity
-        id="status-board"
-        position="0 2 -6"
-        rotation="0 0 0"
-        visible="true"
-      >
-        <a-plane
-          width="5.5"
-          height="2"
-          color="#020617"
-          material="opacity: 0.95"
-        ></a-plane>
-        <a-entity
-          id="status-text"
-          position="0 0 0.01"
-          class="pb-text"
-          troika-text="value: Collect ticket (NEON ORANGE)\nPick wristband (NEON GREEN / ORANGE / PURPLE / RED)\nQueue at security, then follow the NEON PINK path into the arena.; align: center; maxWidth: 5; fontSize: 0.24; color: #f9fafb"
-        ></a-entity>
+      <a-entity id="status-board" position="0 2 -6" rotation="0 0 0" visible="true">
+        <a-plane width="5.5" height="2" color="#020617" material="opacity: 0.95"></a-plane>
+        <a-entity id="status-text" position="0 0 0.01" class="pb-text" troika-text="value: Collect ticket (NEON ORANGE)\nPick wristband (NEON GREEN / ORANGE / PURPLE / RED)\nQueue at security, then follow the NEON PINK path into the arena.; align: center; maxWidth: 5; fontSize: 0.24; color: #f9fafb"></a-entity>
       </a-entity>
 
       <!-- Control settings panel near entrance -->
       <a-entity id="settings-panel" position="-3 1.4 24" rotation="0 15 0">
-        <a-plane
-          width="2.8"
-          height="1.4"
-          color="#020617"
-          material="opacity: 0.95"
-        ></a-plane>
-        <a-entity
-          position="0 0.4 0.01"
-          class="pb-text"
-          troika-text="value: Control Settings; align: center; maxWidth: 2.4; fontSize: 0.24; color: #e5e7eb"
-        ></a-entity>
+        <a-plane width="2.8" height="1.4" color="#020617" material="opacity: 0.95"></a-plane>
+        <a-entity position="0 0.4 0.01" class="pb-text" troika-text="value: Control Settings; align: center; maxWidth: 2.4; fontSize: 0.24; color: #e5e7eb"></a-entity>
 
         <!-- Desktop mode button -->
-        <a-plane
-          id="btn-desktop"
-          class="interactive"
-          position="0 0 0.02"
-          width="2.4"
-          height="0.4"
-          color="#111827"
-          material="opacity: 0.9"
-          control-switch="mode: desktop"
-          hoverable
-        >
-          <a-entity
-            position="0 0 0.01"
-            class="pb-text"
-            troika-text="value: Desktop / Laptop; align: center; maxWidth: 2; fontSize: 0.22; color: #22c55e"
-          ></a-entity>
+        <a-plane id="btn-desktop" class="interactive clickable" position="0 0 0.02" width="2.4" height="0.4" color="#111827" material="opacity: 0.9" control-switch="mode: desktop" hoverable>
+          <a-entity position="0 0 0.01" class="pb-text" troika-text="value: Desktop / Laptop; align: center; maxWidth: 2; fontSize: 0.22; color: #22c55e"></a-entity>
         </a-plane>
 
         <!-- VR mode button -->
-        <a-plane
-          id="btn-vr"
-          class="interactive"
-          position="0 -0.45 0.02"
-          width="2.4"
-          height="0.4"
-          color="#111827"
-          material="opacity: 0.9"
-          control-switch="mode: vr"
-          hoverable
-        >
-          <a-entity
-            position="0 0 0.01"
-            class="pb-text"
-            troika-text="value: VR Headset; align: center; maxWidth: 2; fontSize: 0.22; color: #d946ef"
-          ></a-entity>
+        <a-plane id="btn-vr" class="interactive clickable" position="0 -0.45 0.02" width="2.4" height="0.4" color="#111827" material="opacity: 0.9" control-switch="mode: vr" hoverable>
+          <a-entity position="0 0 0.01" class="pb-text" troika-text="value: VR Headset; align: center; maxWidth: 2; fontSize: 0.22; color: #d946ef"></a-entity>
         </a-plane>
       </a-entity>
     </a-scene>
 
     <script>
+      // ============================================================
+      // CUSTOM LOGIC: SNAP TURN & PINCH-TO-CLICK
+      // ============================================================
+      AFRAME.registerComponent('snap-turn', {
+          schema: { target: {type: 'selector'}, angle: {type: 'number', default: 30} },
+          init: function() {
+              this.isCooldown = false;
+              this.el.addEventListener('axismove', (e) => {
+                  if (this.isCooldown) return;
+                  const axis = e.detail.axis;
+                  if (axis[0] > 0.5) { this.rotate(-this.data.angle); }
+                  else if (axis[0] < -0.5) { this.rotate(this.data.angle); }
+              });
+          },
+          rotate: function(angle) {
+              if (!this.data.target) return;
+              this.isCooldown = true;
+              const rot = this.data.target.getAttribute('rotation');
+              this.data.target.setAttribute('rotation', {x: rot.x, y: rot.y + angle, z: rot.z});
+              setTimeout(() => { this.isCooldown = false; }, 400); 
+          }
+      });
+
+      AFRAME.registerComponent('pinch-to-click', {
+          init: function () {
+              this.el.addEventListener('pinchstarted', () => {
+                  const target = this.el.components['sphere-collider']?.intersectedEls[0];
+                  if (target) {
+                      target.emit('click');
+                      target.emit('grab-start'); 
+                  }
+              });
+          }
+      });
+
       // ============================================================
       // PLAYER STATE COMPONENT (ticket, wristband, security cleared)
       // ============================================================
@@ -1328,7 +712,7 @@
       AFRAME.registerComponent("pickup-ticket", {
         init: function () {
           const el = this.el;
-          const rig = document.querySelector("#player-rig");
+          const rig = document.querySelector("#rig");
           if (!rig) return;
 
           const markTicketCollected = () => {
@@ -1358,7 +742,7 @@
         },
         init: function () {
           const el = this.el;
-          const rig = document.querySelector("#player-rig");
+          const rig = document.querySelector("#rig");
           if (!rig) return;
 
           const markWristbandCollected = () => {
@@ -1408,7 +792,7 @@
       // ============================================================
       AFRAME.registerComponent("security-gate", {
         init: function () {
-          this.playerRig = document.querySelector("#player-rig");
+          this.playerRig = document.querySelector("#rig");
           this.gate = document.querySelector("#security-gate");
           this.opened = false;
 
@@ -1428,6 +812,7 @@
           // Trigger when hands hover or user clicks on the gate
           this.gate.addEventListener("hover-start", tryOpen);
           this.gate.addEventListener("click", tryOpen);
+          this.gate.addEventListener("grab-start", tryOpen);
         },
 
         openGate: function () {
@@ -1438,7 +823,7 @@
           // Animate the gate sliding upwards to "open"
           this.gate.setAttribute("animation__open", {
             property: "position",
-            to: "0 3 -1.2",
+            to: "0 4.5 -0.5",
             dur: 900,
             easing: "easeOutQuad",
           });
@@ -1464,12 +849,11 @@
 
       // ============================================================
       // OPTIONAL: SNAP PLAYER A LITTLE FORWARD WHEN SECURITY CLEARED
-      // (simple crowd-control movement into the arena bowl)
       // ============================================================
       AFRAME.registerComponent("auto-step-forward", {
         schema: { distance: { type: "number", default: 3 } },
         init: function () {
-          const rig = document.querySelector("#player-rig");
+          const rig = document.querySelector("#rig");
           if (!rig) return;
 
           this.rig = rig;
@@ -1549,7 +933,7 @@
         init: function () {
           const el = this.el;
           el.addEventListener("click", () => {
-            const rig = document.querySelector("#player-rig");
+            const rig = document.querySelector("#rig");
             if (!rig) return;
             rig.setAttribute("control-profile", "mode", this.data.mode);
           });
@@ -1745,7 +1129,7 @@
             // Keep default font if Point Blank isn't provided yet.
           });
 
-        const rig = document.querySelector("#player-rig");
+        const rig = document.querySelector("#rig");
         if (rig && !rig.hasAttribute("auto-step-forward")) {
           rig.setAttribute("auto-step-forward", "distance: 3");
         }
