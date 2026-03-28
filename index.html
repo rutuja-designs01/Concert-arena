@@ -1,1226 +1,472 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <title>Stadium Concert Arena – WebXR</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebXR Concert Arena</title>
 
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-    <script src="https://unpkg.com/aframe-troika-text@0.14.0/dist/aframe-troika-text.min.js"></script>
-    <script src="https://unpkg.com/aframe-environment-component@1.3.2/dist/aframe-environment-component.min.js"></script>
-
-    <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@6.1.1/dist/aframe-extras.min.js"></script>
-
-    <script src="https://unpkg.com/super-hands@^3.0.0/dist/super-hands.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.2.0/dist/aframe-extras.min.js"></script>
 
     <style>
-      @font-face {
-        font-family: "Point Blank";
-        src: url("assets/fonts/PointBlank.woff2") format("woff2"),
-          url("assets/fonts/PointBlank.woff") format("woff");
-        font-display: swap;
-      }
+        /* === UI OVERLAYS & STYLING === */
+        body, html { margin: 0; padding: 0; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        
+        .ui-panel {
+            position: fixed;
+            z-index: 999;
+            pointer-events: auto;
+            background: #0a0a2edd;
+        }
 
-      body {
-        margin: 0;
-        overflow: hidden;
-        font-family: "Point Blank", system-ui, -apple-system,
-          BlinkMacSystemFont, "Segoe UI", sans-serif;
-        background: #000;
-        color: #fff;
-      }
-      #hud,
-      #legend {
-        position: fixed;
-        background: rgba(0, 0, 0, 0.6);
-        padding: 10px 14px;
-        border-radius: 999px;
-        font-size: 13px;
-        letter-spacing: 0.02em;
-        backdrop-filter: blur(10px);
-        z-index: 10;
-      }
-      #hud {
-        left: 50%;
-        bottom: 20px;
-        transform: translateX(-50%);
-      }
-      #legend {
-        right: 20px;
-        top: 20px;
-        max-width: 260px;
-        border-radius: 16px;
-        line-height: 1.4;
-      }
-      #legend h2 {
-        font-size: 13px;
-        margin: 0 0 4px;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        color: #e5e7eb;
-      }
-      #legend .pill {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        font-size: 11px;
-        margin-right: 8px;
-        margin-bottom: 4px;
-        padding: 2px 8px;
-        border-radius: 999px;
-        background: rgba(15, 23, 42, 0.8);
-      }
-      #legend .pill span {
-        width: 10px;
-        height: 10px;
-        border-radius: 999px;
-        display: inline-block;
-      }
-      #hud strong {
-        color: #5dd6ff;
-      }
+        /* Top Bar */
+        #top-bar {
+            top: 0; left: 0; right: 0;
+            height: 44px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #FF3CAC;
+        }
+        #top-title {
+            color: #FF3CAC;
+            font-size: 18px;
+            font-weight: 600;
+            padding-left: 16px;
+            text-shadow: 0 0 5px #FF3CAC;
+        }
+        #top-live {
+            color: #FFD93D;
+            font-size: 16px;
+            font-weight: 600;
+            padding-right: 16px;
+            animation: pulse-live 1s infinite alternate;
+        }
+
+        @keyframes pulse-live {
+            from { opacity: 1; text-shadow: 0 0 8px #FFD93D; }
+            to { opacity: 0.3; text-shadow: none; }
+        }
+
+        /* Bottom Right: VR Toggle */
+        #vr-btn {
+            bottom: 20px; right: 20px;
+            border: 1px solid #2BD2FF;
+            color: #2BD2FF;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            text-shadow: 0 0 5px #2BD2FF;
+            box-shadow: 0 0 10px rgba(43, 210, 255, 0.3);
+            transition: all 0.3s;
+        }
+        #vr-btn:hover { background: rgba(43, 210, 255, 0.2); }
+
+        /* Bottom Left: Minimap */
+        #minimap-container {
+            bottom: 20px; left: 20px;
+            border: 1px solid #2BD2FF;
+            border-radius: 8px;
+            padding: 10px;
+            box-shadow: 0 0 15px rgba(43, 210, 255, 0.2);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        #minimap-label { color: #2BD2FF; font-size: 12px; font-weight: bold; margin-bottom: 5px; letter-spacing: 2px;}
+        #minimap-canvas { background: #0a0a2e; border-radius: 4px; }
+
+        /* Center: Zone Directory Panel */
+        #zone-directory {
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 280px;
+            border: 1px solid #2BD2FF;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 0 20px rgba(43, 210, 255, 0.4);
+            display: none; /* Hidden by default */
+        }
+        #zone-directory h2 { color: #2BD2FF; text-align: center; margin-top: 0; font-size: 18px;}
+        .zone-row {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px;
+        }
+        .zone-name { color: #fff; font-size: 14px; }
+        .go-btn {
+            background: transparent; border: 1px solid #2BD2FF; color: #2BD2FF;
+            padding: 4px 12px; border-radius: 4px; cursor: pointer;
+            font-size: 12px; font-weight: bold;
+        }
+        .go-btn:hover { background: rgba(43, 210, 255, 0.3); }
+
     </style>
-  </head>
-  <body>
-    <div id="hud">
-      <strong>Meta Quest 3 tips:</strong>
-      Use thumbstick or teleport to move. Reach out with your hands to grab
-      the ticket and wristband, then queue at security to enter the arena.
-    </div>
-    <div id="legend">
-      <h2>Flow Legend</h2>
-      <div class="pill">
-        <span style="background:#fb923c"></span> Ticket Stand
-      </div>
-      <div class="pill">
-        <span style="background:#d946ef"></span> Wristband Zone
-      </div>
-      <div class="pill">
-        <span style="background:#ec4899"></span> Security → Arena Path
-      </div>
-      <div class="pill">
-        <span style="background:#22c55e"></span> Seating Access Paths
-      </div>
-    </div>
-
-    <a-scene
-      renderer="antialias: true; colorManagement: true; physicallyCorrectLights: true; toneMapping: ACESFilmic;"
-      environment="preset: starry; ground: canyon; groundColor: #050816; skyColor: #020617; lighting: distant;"
-      webxr="optionalFeatures: hand-tracking, local-floor;"
-      background="color: #02030a"
-      vr-mode-ui="enabled: true"
-      cursor="rayOrigin: mouse"
-      fog="type: exponential; color: #020617; density: 0.025"
-    >
-      <a-assets timeout="60000">
-        <a-mixin
-          id="zone-label"
-          class="pb-text"
-          troika-text="value: ; align: center; anchor: center; baseline: center; maxWidth: 5; fontSize: 0.28; color: #ffffff"
-          scale="1 1 1"
-        ></a-mixin>
-        <a-mixin
-          id="zone-floor"
-          geometry="primitive: box; depth: 4; height: 0.1; width: 6"
-          material="color: #202028; metalness: 0.25; roughness: 0.85"
-        ></a-mixin>
-
-        <audio
-          id="concert-track"
-          src="https://cdn.pixabay.com/audio/2022/03/15/audio_608f3cb965.mp3"
-          preload="auto"
-        ></audio>
-        <audio
-          id="crowd-ambience"
-          src="https://cdn.pixabay.com/audio/2022/03/15/audio_9e4d0d9a2d.mp3"
-          preload="auto"
-        ></audio>
-      </a-assets>
-
-      <a-entity light="type: ambient; intensity: 0.75; color: #d1d5db"></a-entity>
-      <a-entity
-        light="type: spot; color: #d946ef; intensity: 1.6; angle: 58; castShadow: true"
-        position="0 12 0"
-        rotation="-90 0 0"
-      ></a-entity>
-      <a-entity
-        light="type: spot; color: #ec4899; intensity: 1.6; angle: 58; castShadow: true"
-        position="10 12 10"
-        rotation="-90 -45 0"
-      ></a-entity>
-
-      <a-entity light="type: point; intensity: 1.2; distance: 35; decay: 2; color: #22c55e" position="0 6 -16"></a-entity>
-      <a-entity light="type: point; intensity: 1.2; distance: 35; decay: 2; color: #fb923c" position="16 6 0"></a-entity>
-      <a-entity light="type: point; intensity: 1.2; distance: 35; decay: 2; color: #d946ef" position="0 6 16"></a-entity>
-      <a-entity light="type: point; intensity: 1.2; distance: 35; decay: 2; color: #ec4899" position="-16 6 0"></a-entity>
-
-      <a-entity id="moving-lights">
-        <a-cone
-          position="0 6 0"
-          radius-bottom="2"
-          radius-top="0.1"
-          height="10"
-          rotation="-70 0 0"
-          material="color: #22c55e; opacity: 0.22; transparent: true"
-          animation__spin="property: rotation; to: -70 360 0; loop: true; dur: 12000; easing: linear"
-        ></a-cone>
-        <a-cone
-          position="0 6 0"
-          radius-bottom="2"
-          radius-top="0.1"
-          height="10"
-          rotation="-70 180 0"
-          material="color: #ec4899; opacity: 0.22; transparent: true"
-          animation__spin="property: rotation; to: -70 540 0; loop: true; dur: 16000; easing: linear"
-        ></a-cone>
-      </a-entity>
-
-      <a-circle
-        id="arena-floor"
-        radius="18"
-        color="#14141f"
-        rotation="-90 0 0"
-        position="0 0 0"
-      ></a-circle>
-
-      <a-cylinder
-        id="stage"
-        position="0 0.5 0"
-        radius="4"
-        height="1"
-        color="#3b1b5c"
-        material="metalness: 0.6; roughness: 0.2; emissive: #471a75; emissiveIntensity: 0.7"
-        animation__pulse="property: material.emissiveIntensity; dir: alternate; from: 0.4; to: 1.1; loop: true; dur: 1800; easing: easeInOutSine"
-      ></a-cylinder>
-
-      <a-torus
-        position="0 3.5 0"
-        radius="5"
-        radius-tubular="0.08"
-        material="color: #22d3ee; emissive: #22d3ee; emissiveIntensity: 0.9; metalness: 0.8; roughness: 0.1; opacity: 0.7; transparent: true"
-        animation__spin="property: rotation; to: 0 360 0; loop: true; dur: 14000; easing: linear"
-      ></a-torus>
-
-      <a-entity id="stage-rig">
-        <a-box
-          position="4 4 0"
-          depth="0.2"
-          height="8"
-          width="0.2"
-          color="#151515"
-        ></a-box>
-        <a-box
-          position="-4 4 0"
-          depth="0.2"
-          height="8"
-          width="0.2"
-          color="#151515"
-        ></a-box>
-        <a-box
-          position="0 4 4"
-          depth="0.2"
-          height="8"
-          width="0.2"
-          color="#151515"
-        ></a-box>
-        <a-box
-          position="0 4 -4"
-          depth="0.2"
-          height="8"
-          width="0.2"
-          color="#151515"
-        ></a-box>
-      </a-entity>
-
-      <a-ring
-        position="0 0.6 0"
-        radius-inner="8"
-        radius-outer="10"
-        rotation="-90 0 0"
-        material="color: #222; metalness: 0.25; roughness: 0.9"
-      ></a-ring>
-      <a-ring
-        position="0 1.2 0"
-        radius-inner="11"
-        radius-outer="13"
-        rotation="-90 0 0"
-        material="color: #181818; metalness: 0.25; roughness: 0.9"
-      ></a-ring>
-      <a-ring
-        position="0 1.8 0"
-        radius-inner="14"
-        radius-outer="16"
-        rotation="-90 0 0"
-        material="color: #101010; metalness: 0.2; roughness: 0.95"
-      ></a-ring>
-
-      <a-torus
-        position="0 0.62 0"
-        radius="10"
-        radius-tubular="0.06"
-        material="color: #fb923c; emissive: #fb923c; emissiveIntensity: 0.9; metalness: 0.7; roughness: 0.2"
-      ></a-torus>
-      <a-torus
-        position="0 1.22 0"
-        radius="13"
-        radius-tubular="0.06"
-        material="color: #d946ef; emissive: #d946ef; emissiveIntensity: 0.9; metalness: 0.7; roughness: 0.2"
-      ></a-torus>
-      <a-torus
-        position="0 1.82 0"
-        radius="16"
-        radius-tubular="0.06"
-        material="color: #ec4899; emissive: #ec4899; emissiveIntensity: 0.9; metalness: 0.7; roughness: 0.2"
-      ></a-torus>
-
-      <a-entity id="crowd" spawn-crowd></a-entity>
-
-      <a-entity id="section-labels">
-        <a-entity
-          position="0 2.4 -15"
-          rotation="0 0 0"
-          class="pb-text"
-          troika-text="value: SECTION A; align: center; maxWidth: 4; fontSize: 0.32; color: #e5e7eb"
-        ></a-entity>
-        <a-entity
-          position="15 2.4 0"
-          rotation="0 -90 0"
-          class="pb-text"
-          troika-text="value: SECTION B; align: center; maxWidth: 4; fontSize: 0.32; color: #e5e7eb"
-        ></a-entity>
-        <a-entity
-          position="0 2.4 15"
-          rotation="0 180 0"
-          class="pb-text"
-          troika-text="value: SECTION C; align: center; maxWidth: 4; fontSize: 0.32; color: #e5e7eb"
-        ></a-entity>
-        <a-entity
-          position="-15 2.4 0"
-          rotation="0 90 0"
-          class="pb-text"
-          troika-text="value: SECTION D; align: center; maxWidth: 4; fontSize: 0.32; color: #e5e7eb"
-        ></a-entity>
-      </a-entity>
-
-      <a-entity id="stadium-shell">
-        <a-cylinder
-          position="0 4 0"
-          radius="20"
-          height="8"
-          color="#021a3b"
-          material="color: #021a3b; emissive: #0f2f6b; emissiveIntensity: 0.4; metalness: 0.4; roughness: 0.85"
-          segments-radial="32"
-          open-ended="true"
-        ></a-cylinder>
-
-        <a-ring
-          position="0 8 0"
-          radius-inner="18"
-          radius-outer="21"
-          rotation="-90 0 0"
-          material="color: #0b1120; metalness: 0.5; roughness: 0.6"
-        ></a-ring>
-
-        <a-torus
-          position="0 8.2 0"
-          radius="20.8"
-          radius-tubular="0.09"
-          material="color: #ec4899; emissive: #ec4899; emissiveIntensity: 1.0; metalness: 0.7; roughness: 0.2"
-          animation__led="property: material.color; dir: alternate; from: #ec4899; to: #d946ef; dur: 900; loop: true; easing: easeInOutSine"
-        ></a-torus>
-
-        <a-torus
-          position="0 10.5 0"
-          radius="21.5"
-          radius-tubular="0.2"
-          material="color: #111827; metalness: 0.7; roughness: 0.4"
-        ></a-torus>
-
-        <a-box position="0 6 -18" width="0.6" height="12" depth="0.6" color="#111827"></a-box>
-        <a-box position="18 6 0" width="0.6" height="12" depth="0.6" color="#111827"></a-box>
-        <a-box position="0 6 18" width="0.6" height="12" depth="0.6" color="#111827"></a-box>
-        <a-box position="-18 6 0" width="0.6" height="12" depth="0.6" color="#111827"></a-box>
-
-        <a-plane
-          position="0 9 -13"
-          rotation="0 0 0"
-          width="8"
-          height="3"
-          color="#020617"
-          material="metalness: 0.7; roughness: 0.3"
-        ></a-plane>
-        <a-entity
-          position="0 9 -12.99"
-          class="pb-text"
-          troika-text="value: LIVE STADIUM SHOW; align: center; maxWidth: 7.5; fontSize: 0.5; color: #e5e7eb; outlineWidth: 0.006; outlineColor: #000000"
-        ></a-entity>
-      </a-entity>
-
-      <a-entity id="crowd-paths">
-        <a-box position="0 0.01 -10" depth="8" height="0.05" width="2" rotation="0 0 0" color="#22c55e" material="opacity: 0.7; emissive: #22c55e; emissiveIntensity: 0.5"></a-box>
-        <a-box position="10 0.01 0" depth="2" height="0.05" width="8" rotation="0 90 0" color="#fb923c" material="opacity: 0.7; emissive: #fb923c; emissiveIntensity: 0.5"></a-box>
-        <a-box position="0 0.01 12" depth="10" height="0.05" width="2" rotation="0 0 0" color="#ec4899" material="opacity: 0.7; emissive: #ec4899; emissiveIntensity: 0.55"></a-box>
-        <a-box position="-10 0.01 0" depth="2" height="0.05" width="8" rotation="0 90 0" color="#d946ef" material="opacity: 0.7; emissive: #d946ef; emissiveIntensity: 0.55"></a-box>
-      </a-entity>
-
-      <a-entity id="entrance-zone" position="0 0 26">
-        <a-entity
-          mixin="zone-floor"
-          position="0 0 0"
-          geometry="primitive: box; width: 14; depth: 6; height: 0.12"
-          material="color: #020617; emissive: #0b1025; emissiveIntensity: 0.25"
-        ></a-entity>
-
-        <a-entity position="0 2.2 0">
-          <a-box position="0 1 0" width="10" height="0.35" depth="0.4" color="#d946ef" material="emissive: #d946ef; emissiveIntensity: 0.9"></a-box>
-          <a-box position="-4.6 0 0" width="0.55" height="2.6" depth="0.55" color="#0f172a"></a-box>
-          <a-box position="4.6 0 0" width="0.55" height="2.6" depth="0.55" color="#0f172a"></a-box>
-          <a-box position="-4.6 2.4 0" width="0.4" height="2.2" depth="0.4" color="#ec4899" material="emissive: #ec4899; emissiveIntensity: 0.8"></a-box>
-          <a-box position="4.6 2.4 0" width="0.4" height="2.2" depth="0.4" color="#22c55e" material="emissive: #22c55e; emissiveIntensity: 0.8"></a-box>
-        </a-entity>
-
-        <a-entity
-          mixin="zone-label"
-          position="0 2.8 0"
-          troika-text="value: STADIUM MAIN ENTRANCE; color: #22c55e; fontSize: 0.42; maxWidth: 7; outlineWidth: 0.006; outlineColor: #000000"
-        ></a-entity>
-        <a-entity
-          position="0 1.2 2"
-          class="pb-text"
-          troika-text="value: START →\nWalk through the gate, then go LEFT for ticket + wristband.; align: center; maxWidth: 6.5; fontSize: 0.26; color: #e5e7eb"
-        ></a-entity>
-      </a-entity>
-
-      <a-entity id="ticket-zone" position="-9 0 22">
-        <a-entity
-          mixin="zone-floor"
-          position="0 0 0"
-          geometry="primitive: box; width: 6.5; depth: 4.5; height: 0.12"
-          material="color: #020617; emissive: #1a0f05; emissiveIntensity: 0.25"
-        ></a-entity>
-
-        <a-box position="0 1 0" width="3.4" height="1.6" depth="1.2" color="#020617"></a-box>
-        <a-box position="0 1.8 0.5" width="3" height="0.6" depth="0.1" color="#fb923c" material="emissive: #fb923c; emissiveIntensity: 0.9"></a-box>
-
-        <a-box
-          id="ticket-item"
-          class="interactive pickup-ticket"
-          position="0 1.35 0.85"
-          width="0.45"
-          height="0.24"
-          depth="0.03"
-          color="#fb923c"
-          material="metalness: 0.25; roughness: 0.35; emissive: #fb923c; emissiveIntensity: 0.85"
-          hoverable grabbable pickup-ticket
-        >
-          <a-entity
-            position="0 0 0.03"
-            class="pb-text"
-            troika-text="value: TICKET; align: center; maxWidth: 1.4; fontSize: 0.22; color: #000000"
-          ></a-entity>
-        </a-box>
-
-        <a-entity id="ticket-stack-standing" position="-0.9 1.05 0.1">
-          <a-box width="0.4" height="0.02" depth="0.22" color="#16a34a"></a-box>
-          <a-box position="0 0.025 0" width="0.4" height="0.02" depth="0.22" color="#22c55e"></a-box>
-          <a-box position="0 0.05 0" width="0.4" height="0.02" depth="0.22" color="#4ade80"></a-box>
-        </a-entity>
-
-        <a-entity id="ticket-stack-gold" position="-0.3 1.05 0.1">
-          <a-box width="0.4" height="0.02" depth="0.22" color="#ea580c"></a-box>
-          <a-box position="0 0.025 0" width="0.4" height="0.02" depth="0.22" color="#fb923c"></a-box>
-          <a-box position="0 0.05 0" width="0.4" height="0.02" depth="0.22" color="#fed7aa"></a-box>
-        </a-entity>
-
-        <a-entity id="ticket-stack-platinum" position="0.3 1.05 0.1">
-          <a-box width="0.4" height="0.02" depth="0.22" color="#7e22ce"></a-box>
-          <a-box position="0 0.025 0" width="0.4" height="0.02" depth="0.22" color="#d946ef"></a-box>
-          <a-box position="0 0.05 0" width="0.4" height="0.02" depth="0.22" color="#f5d0fe"></a-box>
-        </a-entity>
-
-        <a-entity id="ticket-stack-vip" position="0.9 1.05 0.1">
-          <a-box width="0.4" height="0.02" depth="0.22" color="#b91c1c"></a-box>
-          <a-box position="0 0.025 0" width="0.4" height="0.02" depth="0.22" color="#ef4444"></a-box>
-          <a-box position="0 0.05 0" width="0.4" height="0.02" depth="0.22" color="#fecaca"></a-box>
-        </a-entity>
-
-        <a-entity
-          mixin="zone-label"
-          position="0 2.4 0"
-          troika-text="value: TICKET BOOKING; color: #fb923c; fontSize: 0.38; maxWidth: 5.5; outlineWidth: 0.006; outlineColor: #000000"
-        ></a-entity>
-        <a-entity
-          position="0 0.25 1.8"
-          class="pb-text"
-          troika-text="value: Take your TICKET.\nTicket bundles: GREEN Standing  ORANGE Gold  PURPLE Platinum  RED VIP.; align: center; maxWidth: 5.3; fontSize: 0.22; color: #e5e7eb"
-        ></a-entity>
-
-        <a-box position="0 0.07 2.25" width="6.6" height="0.06" depth="0.08" color="#fb923c" material="emissive: #fb923c; emissiveIntensity: 0.9"></a-box>
-        <a-box position="0 0.07 -2.25" width="6.6" height="0.06" depth="0.08" color="#ec4899" material="emissive: #ec4899; emissiveIntensity: 0.9"></a-box>
-      </a-entity>
-
-      <a-entity id="wristband-zone" position="-2.5 0 22">
-        <a-entity
-          mixin="zone-floor"
-          position="0 0 0"
-          geometry="primitive: box; width: 7; depth: 4.5; height: 0.12"
-          material="color: #020617; emissive: #17051a; emissiveIntensity: 0.25"
-        ></a-entity>
-
-        <a-box position="0 1 0" width="3" height="1.4" depth="1" color="#020617"></a-box>
-
-        <a-torus
-          id="band-standing"
-          class="interactive"
-          position="-0.9 1.35 0.7"
-          radius="0.16"
-          radius-tubular="0.04"
-          color="#22c55e"
-          material="metalness: 0.6; roughness: 0.25; emissive: #22c55e; emissiveIntensity: 0.6"
-          hoverable pickup-wristband="bandType: standing"
-        ></a-torus>
-        <a-torus
-          id="band-gold"
-          class="interactive"
-          position="-0.3 1.35 0.7"
-          radius="0.16"
-          radius-tubular="0.04"
-          color="#fb923c"
-          material="metalness: 0.6; roughness: 0.25; emissive: #fb923c; emissiveIntensity: 0.7"
-          hoverable pickup-wristband="bandType: gold"
-        ></a-torus>
-        <a-torus
-          id="band-platinum"
-          class="interactive"
-          position="0.3 1.35 0.7"
-          radius="0.16"
-          radius-tubular="0.04"
-          color="#d946ef"
-          material="metalness: 0.6; roughness: 0.25; emissive: #d946ef; emissiveIntensity: 0.75"
-          hoverable pickup-wristband="bandType: platinum"
-        ></a-torus>
-        <a-torus
-          id="band-vip"
-          class="interactive"
-          position="0.9 1.35 0.7"
-          radius="0.16"
-          radius-tubular="0.04"
-          color="#ef4444"
-          material="metalness: 0.6; roughness: 0.25; emissive: #ef4444; emissiveIntensity: 0.7"
-          hoverable pickup-wristband="bandType: vip"
-        ></a-torus>
-
-        <a-entity
-          mixin="zone-label"
-          position="0 2.4 0"
-          troika-text="value: WRISTBAND STATION; color: #d946ef; fontSize: 0.38; maxWidth: 6; outlineWidth: 0.006; outlineColor: #000000"
-        ></a-entity>
-        <a-entity
-          position="0 0.25 1.8"
-          class="pb-text"
-          troika-text="value: Pinch (right hand) or click a band:\nGREEN=Standing  ORANGE=Gold  PURPLE=Platinum  RED=VIP; align: center; maxWidth: 6.5; fontSize: 0.22; color: #e5e7eb"
-        ></a-entity>
-
-        <a-box position="0 0.07 2.25" width="7.1" height="0.06" depth="0.08" color="#d946ef" material="emissive: #d946ef; emissiveIntensity: 0.9"></a-box>
-        <a-box position="0 0.07 -2.25" width="7.1" height="0.06" depth="0.08" color="#22c55e" material="emissive: #22c55e; emissiveIntensity: 0.9"></a-box>
-      </a-entity>
-
-      <a-entity id="security-zone" position="0 0 15" scale="1.6 1.6 1.6">
-        <a-box position="-1.2 0.01 1" width="0.4" height="0.05" depth="4" color="#d946ef" material="opacity: 0.8; emissive: #d946ef; emissiveIntensity: 0.5"></a-box>
-        <a-box position="0 0.01 1" width="0.4" height="0.05" depth="4" color="#ec4899" material="opacity: 0.8; emissive: #ec4899; emissiveIntensity: 0.5"></a-box>
-        <a-box position="1.2 0.01 1" width="0.4" height="0.05" depth="4" color="#22c55e" material="opacity: 0.8; emissive: #22c55e; emissiveIntensity: 0.5"></a-box>
-
-        <a-entity id="queue-poles">
-          <a-cylinder position="-1.2 0.6 -1" radius="0.05" height="1.2" color="#0f172a" material="emissive: #ec4899; emissiveIntensity: 0.25"></a-cylinder>
-          <a-cylinder position="-1.2 0.6 1" radius="0.05" height="1.2" color="#0f172a" material="emissive: #d946ef; emissiveIntensity: 0.25"></a-cylinder>
-          <a-cylinder position="0 0.6 -1" radius="0.05" height="1.2" color="#0f172a" material="emissive: #22c55e; emissiveIntensity: 0.25"></a-cylinder>
-          <a-cylinder position="0 0.6 1" radius="0.05" height="1.2" color="#0f172a" material="emissive: #fb923c; emissiveIntensity: 0.25"></a-cylinder>
-          <a-cylinder position="1.2 0.6 -1" radius="0.05" height="1.2" color="#0f172a" material="emissive: #ec4899; emissiveIntensity: 0.25"></a-cylinder>
-          <a-cylinder position="1.2 0.6 1" radius="0.05" height="1.2" color="#0f172a" material="emissive: #fb923c; emissiveIntensity: 0.25"></a-cylinder>
-        </a-entity>
-
-        <a-entity id="stanchion-belts" position="0 0 0">
-          <a-box position="-0.6 0.9 -1" width="1.2" height="0.06" depth="0.04" color="#ec4899" material="emissive: #ec4899; emissiveIntensity: 0.9" animation__glow="property: material.emissiveIntensity; dir: alternate; from: 0.4; to: 1.1; loop: true; dur: 900; easing: easeInOutSine"></a-box>
-          <a-box position="0.6 0.9 -1" width="1.2" height="0.06" depth="0.04" color="#d946ef" material="emissive: #d946ef; emissiveIntensity: 0.9" animation__glow="property: material.emissiveIntensity; dir: alternate; from: 0.4; to: 1.1; loop: true; dur: 1000; easing: easeInOutSine"></a-box>
-          <a-box position="-0.6 0.9 1" width="1.2" height="0.06" depth="0.04" color="#fb923c" material="emissive: #fb923c; emissiveIntensity: 0.9" animation__glow="property: material.emissiveIntensity; dir: alternate; from: 0.4; to: 1.1; loop: true; dur: 820; easing: easeInOutSine"></a-box>
-          <a-box position="0.6 0.9 1" width="1.2" height="0.06" depth="0.04" color="#22c55e" material="emissive: #22c55e; emissiveIntensity: 0.9" animation__glow="property: material.emissiveIntensity; dir: alternate; from: 0.4; to: 1.1; loop: true; dur: 880; easing: easeInOutSine"></a-box>
-        </a-entity>
-
-        <a-entity id="security-gate-root" position="0 0 0" security-gate>
-          <a-box
-            id="security-gate"
-            position="0 2 -1.4"
-            width="5"
-            height="2.6"
-            depth="0.15"
-            color="#ec4899"
-            material="emissive: #ec4899; emissiveIntensity: 0.75"
-            hoverable
-          ></a-box>
-          <a-entity
-            id="security-label"
-            position="0 3.4 -1.4"
-            mixin="zone-label"
-            troika-text="value: SECURITY CHECK; color: #ec4899; fontSize: 0.38; maxWidth: 5.5; outlineWidth: 0.006; outlineColor: #000000"
-          ></a-entity>
-        </a-entity>
-
-        <a-entity id="metal-detectors">
-          <a-box position="-1.5 1.7 -0.2" width="0.3" height="3.2" depth="0.3" color="#1f2937"></a-box>
-          <a-box position="-0.9 1.7 -0.2" width="0.3" height="3.2" depth="0.3" color="#1f2937"></a-box>
-          <a-box position="-0.5 1.7 -0.2" width="0.3" height="3.2" depth="0.3" color="#1f2937"></a-box>
-          <a-box position="0.1 1.7 -0.2" width="0.3" height="3.2" depth="0.3" color="#1f2937"></a-box>
-          <a-box position="0.5 1.7 -0.2" width="0.3" height="3.2" depth="0.3" color="#1f2937"></a-box>
-          <a-box position="1.1 1.7 -0.2" width="0.3" height="3.2" depth="0.3" color="#1f2937"></a-box>
-          <a-box position="-1.2 3.2 -0.2" width="0.9" height="0.25" depth="0.3" color="#111827"></a-box>
-          <a-box position="-0.2 3.2 -0.2" width="0.9" height="0.25" depth="0.3" color="#111827"></a-box>
-          <a-box position="0.8 3.2 -0.2" width="0.9" height="0.25" depth="0.3" color="#111827"></a-box>
-        </a-entity>
-
-        <a-entity id="metal-indicators">
-          <a-sphere position="-1.2 3.5 -0.15" radius="0.12" color="#22c55e" material="emissive: #22c55e; emissiveIntensity: 0.9" animation__blink="property: material.emissiveIntensity; dir: alternate; from: 0.4; to: 1.0; dur: 900; loop: true; easing: easeInOutSine"></a-sphere>
-          <a-sphere position="-0.2 3.5 -0.15" radius="0.12" color="#22c55e" material="emissive: #22c55e; emissiveIntensity: 0.9" animation__blink="property: material.emissiveIntensity; dir: alternate; from: 0.4; to: 1.0; dur: 1000; loop: true; easing: easeInOutSine"></a-sphere>
-          <a-sphere position="0.8 3.5 -0.15" radius="0.12" color="#22c55e" material="emissive: #22c55e; emissiveIntensity: 0.9" animation__blink="property: material.emissiveIntensity; dir: alternate; from: 0.4; to: 1.0; dur: 1100; loop: true; easing: easeInOutSine"></a-sphere>
-          <a-sphere position="0 3.8 -0.3" radius="0.13" color="#ef4444" material="emissive: #ef4444; emissiveIntensity: 0.9" animation__blink="property: material.emissiveIntensity; dir: alternate; from: 0.4; to: 1.0; dur: 750; loop: true; easing: easeInOutSine"></a-sphere>
-        </a-entity>
-
-        <a-entity id="zigzag-barriers">
-          <a-box position="0 0.5 0.3" width="2.6" height="0.08" depth="0.08" color="#ec4899" material="emissive: #ec4899; emissiveIntensity: 0.8"></a-box>
-          <a-box position="0 0.5 0.9" width="2.6" height="0.08" depth="0.08" color="#fb923c" material="emissive: #fb923c; emissiveIntensity: 0.8"></a-box>
-          <a-box position="0 0.5 1.5" width="2.6" height="0.08" depth="0.08" color="#22c55e" material="emissive: #22c55e; emissiveIntensity: 0.8"></a-box>
-        </a-entity>
-
-        <a-entity id="xray-zone" position="0 0 -2.4">
-          <a-box position="0 0.8 0" width="3" height="0.6" depth="1" color="#111827"></a-box>
-          <a-box position="0 1.2 0.35" width="1.4" height="1.2" depth="0.2" color="#020617"></a-box>
-          <a-box position="0 1.05 0" width="2.8" height="0.08" depth="0.9" color="#4b5563" material="emissive: #4b5563; emissiveIntensity: 0.2"></a-box>
-          <a-entity
-            position="0 1.6 0.45"
-            class="pb-text"
-            troika-text="value: X-RAY SCREEN; align: center; maxWidth: 2.4; fontSize: 0.25; color: #22c55e"
-          ></a-entity>
-        </a-entity>
-
-        <a-entity id="guards">
-          <a-image
-            src="data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 512'%3E%3Cpath fill='%23ffffff' d='M112 48a48 48 0 1 1 96 0 48 48 0 1 1 -96 0zm40 304V480c0 17.7-14.3 32-32 32s-32-14.3-32-32V256.9L59.4 304.5c-9.1 15.1-28.8 20-43.9 10.9s-20-28.8-10.9-43.9l58.3-97c17.4-28.9 48.6-46.6 82.3-46.6h29.7c33.7 0 64.9 17.7 82.3 46.6l58.3 97c9.1 15.1 4.2 34.8-10.9 43.9s-34.8 4.2-43.9-10.9L232 256.9V480c0 17.7-14.3 32-32 32s-32-14.3-32-32V352H152z'/%3E%3C/svg%3E"
-            position="-1.8 0.9 -0.4"
-            width="0.9" height="1.8"
-            color="#fb923c"
-            material="transparent: true; alphaTest: 0.5; emissive: #fb923c; emissiveIntensity: 0.6"
-            billboard
-          ></a-image>
-          <a-image
-            src="data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 512'%3E%3Cpath fill='%23ffffff' d='M112 48a48 48 0 1 1 96 0 48 48 0 1 1 -96 0zm40 304V480c0 17.7-14.3 32-32 32s-32-14.3-32-32V256.9L59.4 304.5c-9.1 15.1-28.8 20-43.9 10.9s-20-28.8-10.9-43.9l58.3-97c17.4-28.9 48.6-46.6 82.3-46.6h29.7c33.7 0 64.9 17.7 82.3 46.6l58.3 97c9.1 15.1 4.2 34.8-10.9 43.9s-34.8 4.2-43.9-10.9L232 256.9V480c0 17.7-14.3 32-32 32s-32-14.3-32-32V352H152z'/%3E%3C/svg%3E"
-            position="1.8 0.9 -0.4"
-            width="0.9" height="1.8"
-            color="#22c55e"
-            material="transparent: true; alphaTest: 0.5; emissive: #22c55e; emissiveIntensity: 0.6"
-            billboard
-          ></a-image>
-        </a-entity>
-
-        <a-entity
-          position="0 4.0 -0.4"
-          class="pb-text"
-          troika-text="value: SECURITY; align: center; maxWidth: 5; fontSize: 0.5; color: #ffffff; outlineWidth: 0.01; outlineColor: #000000"
-        ></a-entity>
-
-        <a-entity
-          position="0 1.3 1.5"
-          class="pb-text"
-          troika-text="value: QUEUE HERE WITH TICKET + WRISTBAND; align: center; maxWidth: 7; fontSize: 0.24; color: #e5e7eb"
-        ></a-entity>
-      </a-entity>
-
-      <a-entity id="persona" visible="false" persona-queue>
-        <a-image
-          id="persona-body"
-          src="data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 512'%3E%3Cpath fill='%23ffffff' d='M112 48a48 48 0 1 1 96 0 48 48 0 1 1 -96 0zm40 304V480c0 17.7-14.3 32-32 32s-32-14.3-32-32V256.9L59.4 304.5c-9.1 15.1-28.8 20-43.9 10.9s-20-28.8-10.9-43.9l58.3-97c17.4-28.9 48.6-46.6 82.3-46.6h29.7c33.7 0 64.9 17.7 82.3 46.6l58.3 97c9.1 15.1 4.2 34.8-10.9 43.9s-34.8 4.2-43.9-10.9L232 256.9V480c0 17.7-14.3 32-32 32s-32-14.3-32-32V352H152z'/%3E%3C/svg%3E"
-          position="0 0.85 0"
-          width="0.9" height="1.7"
-          color="#22c55e"
-          material="transparent: true; alphaTest: 0.5; emissive: #22c55e; emissiveIntensity: 0.35"
-          billboard
-        ></a-image>
-      </a-entity>
-
-      <a-entity
-        id="player-rig"
-        position="0 0 32"
-        movement-controls="speed: 1.2; fly: false; easingY: 15"
-        wasd-controls="acceleration: 18"
-        player-state
-        control-profile="mode: desktop"
-      >
-        <a-entity
-          id="player-camera"
-          camera
-          position="0 1.6 0"
-          look-controls="pointerLockEnabled: true"
-        >
-          <a-entity
-            id="desktop-reticle"
-            cursor="fuse: false; rayOrigin: entity"
-            raycaster="objects: .interactive"
-            position="0 0 -1"
-            geometry="primitive: ring; radiusInner: 0.01; radiusOuter: 0.017"
-            material="color: #ffffff; opacity: 0.9"
-          ></a-entity>
-        </a-entity>
-
-        <a-entity
-          id="teleport-controls"
-          teleport-controls="cameraRig: #player-rig; teleportOrigin: #player-camera; collisionEntities: #arena-floor, #crowd-paths, #entrance-zone, #ticket-zone, #wristband-zone, #security-zone; button: trigger;"
-          raycaster="objects: #arena-floor, #crowd-paths"
-        ></a-entity>
-
-        <a-entity
-          id="left-hand"
-          hand-tracking-controls="hand: left; modelColor: #5dd6ff"
-          super-hands="colliderEvent: hitstart; colliderEventProperty: els; colliderEndEvent: hitend;"
-        ></a-entity>
-
-        <a-entity
-          id="right-hand"
-          hand-tracking-controls="hand: right; modelColor: #ff6fb1"
-          super-hands="colliderEvent: hitstart; colliderEventProperty: els; colliderEndEvent: hitend;"
-          right-hand-pinch-selector="targets: [pickup-wristband]; maxDistance: 0.28"
-        ></a-entity>
-      </a-entity>
-
-      <a-entity
-        id="status-board"
-        position="0 2 -6"
-        rotation="0 0 0"
-        visible="true"
-      >
-        <a-plane width="5.5" height="2" color="#020617" material="opacity: 0.95"></a-plane>
-        <a-entity
-          id="status-text"
-          position="0 0 0.01"
-          class="pb-text"
-          troika-text="value: Collect ticket (NEON ORANGE)\nPick wristband (NEON GREEN / ORANGE / PURPLE / RED)\nQueue at security, then follow the NEON PINK path into the arena.; align: center; maxWidth: 5; fontSize: 0.24; color: #f9fafb"
-        ></a-entity>
-      </a-entity>
-
-      <a-entity id="settings-panel" position="-3 1.4 24" rotation="0 15 0">
-        <a-plane width="2.8" height="1.4" color="#020617" material="opacity: 0.95"></a-plane>
-        <a-entity
-          position="0 0.4 0.01"
-          class="pb-text"
-          troika-text="value: Control Settings; align: center; maxWidth: 2.4; fontSize: 0.24; color: #e5e7eb"
-        ></a-entity>
-
-        <a-plane
-          id="btn-desktop"
-          class="interactive"
-          position="0 0 0.02"
-          width="2.4"
-          height="0.4"
-          color="#111827"
-          material="opacity: 0.9"
-          control-switch="mode: desktop"
-          hoverable
-        >
-          <a-entity
-            position="0 0 0.01"
-            class="pb-text"
-            troika-text="value: Desktop / Laptop; align: center; maxWidth: 2; fontSize: 0.22; color: #22c55e"
-          ></a-entity>
-        </a-plane>
-
-        <a-plane
-          id="btn-vr"
-          class="interactive"
-          position="0 -0.45 0.02"
-          width="2.4"
-          height="0.4"
-          color="#111827"
-          material="opacity: 0.9"
-          control-switch="mode: vr"
-          hoverable
-        >
-          <a-entity
-            position="0 0 0.01"
-            class="pb-text"
-            troika-text="value: VR Headset; align: center; maxWidth: 2; fontSize: 0.22; color: #d946ef"
-          ></a-entity>
-        </a-plane>
-      </a-entity>
-    </a-scene>
 
     <script>
-      // ============================================================
-      // BILLBOARD COMPONENT (Makes 2D silhouettes face the player)
-      // ============================================================
-      AFRAME.registerComponent('billboard', {
-        init: function () {
-          this.target = new THREE.Vector3();
-        },
-        tick: function () {
-          const camera = this.el.sceneEl.camera;
-          if (camera) {
-            camera.getWorldPosition(this.target);
-            // Lock the Y axis so the crowd doesn't lean back when you look up/down
-            this.target.y = this.el.object3D.position.y;
-            this.el.object3D.lookAt(this.target);
-          }
+        /* === CUSTOM A-FRAME COMPONENTS === */
+
+        // 1. Billboard: Makes entity face the camera
+        AFRAME.registerComponent('billboard', {
+            tick: function () {
+                var camera = document.querySelector('#camera').object3D;
+                this.el.object3D.lookAt(camera.position);
+            }
+        });
+
+        // 2. Scanner Toggle: Red/Green security lights
+        AFRAME.registerComponent('scanner-toggle', {
+            init: function () {
+                this.el.addEventListener('click', () => {
+                    let red = document.querySelector('#red-light');
+                    let green = document.querySelector('#green-light');
+                    let isRedOn = red.getAttribute('emissiveIntensity') == "1";
+                    
+                    red.setAttribute('emissiveIntensity', isRedOn ? "0" : "1");
+                    green.setAttribute('emissiveIntensity', isRedOn ? "1" : "0");
+                });
+            }
+        });
+
+        // 3. Kiosk Proximity: Show HTML Panel if within 4m
+        AFRAME.registerComponent('kiosk-proximity', {
+            tick: function () {
+                let rig = document.querySelector('#rig').object3D;
+                let kiosk = this.el.object3D;
+                let distance = rig.position.distanceTo(kiosk.position);
+                let panel = document.getElementById('zone-directory');
+                
+                if (distance < 4 && panel.style.display !== 'block') {
+                    panel.style.display = 'block';
+                } else if (distance >= 5 && panel.style.display === 'block') {
+                    panel.style.display = 'none';
+                }
+            }
+        });
+
+        // 4. Star System Generator
+        AFRAME.registerComponent('star-system', {
+            init: function() {
+                for(let i=0; i<40; i++) {
+                    let star = document.createElement('a-sphere');
+                    star.setAttribute('radius', '0.05');
+                    star.setAttribute('color', '#ffffff');
+                    star.setAttribute('emissive', '#ffffff');
+                    let x = (Math.random() - 0.5) * 100;
+                    let y = 25 + Math.random() * 35;
+                    let z = (Math.random() - 0.5) * 160;
+                    star.setAttribute('position', `${x} ${y} ${z}`);
+                    this.el.appendChild(star);
+                }
+            }
+        });
+
+        // 5. Ground Arrow Path Generator
+        AFRAME.registerComponent('arrow-path', {
+            init: function() {
+                for(let z=60; z>=-80; z-=8) {
+                    let arrow = document.createElement('a-entity');
+                    arrow.setAttribute('position', `0 0.05 ${z}`);
+                    arrow.setAttribute('rotation', '-90 0 0');
+
+                    // Draw chevron using two thin boxes
+                    let leftBox = document.createElement('a-box');
+                    leftBox.setAttribute('width', '0.2'); leftBox.setAttribute('height', '1.5'); leftBox.setAttribute('depth', '0.05');
+                    leftBox.setAttribute('color', '#FF3CAC'); leftBox.setAttribute('emissive', '#FF3CAC');
+                    leftBox.setAttribute('rotation', '0 0 -45'); leftBox.setAttribute('position', '-0.5 0 0');
+                    leftBox.setAttribute('animation', 'property: material.emissiveIntensity; from: 0.3; to: 1; dur: 1200; dir: alternate; loop: true');
+
+                    let rightBox = document.createElement('a-box');
+                    rightBox.setAttribute('width', '0.2'); rightBox.setAttribute('height', '1.5'); rightBox.setAttribute('depth', '0.05');
+                    rightBox.setAttribute('color', '#FF3CAC'); rightBox.setAttribute('emissive', '#FF3CAC');
+                    rightBox.setAttribute('rotation', '0 0 45'); rightBox.setAttribute('position', '0.5 0 0');
+                    rightBox.setAttribute('animation', 'property: material.emissiveIntensity; from: 0.3; to: 1; dur: 1200; dir: alternate; loop: true');
+
+                    arrow.appendChild(leftBox); arrow.appendChild(rightBox);
+                    this.el.appendChild(arrow);
+                }
+            }
+        });
+
+        // 6. Crowd Generator
+        AFRAME.registerComponent('crowd-system', {
+            init: function() {
+                const colors = ['#FF3CAC', '#2BD2FF', '#52FA7C', '#FFD93D'];
+                for(let i=0; i<40; i++) {
+                    let person = document.createElement('a-entity');
+                    let x = (Math.random() - 0.5) * 40; 
+                    let z = -70 - Math.random() * 10; 
+                    let color = colors[Math.floor(Math.random() * colors.length)];
+                    person.setAttribute('position', `${x} 0 ${z}`);
+
+                    let body = document.createElement('a-cylinder');
+                    body.setAttribute('radius', '0.25'); body.setAttribute('height', '1.2');
+                    body.setAttribute('position', '0 0.6 0'); body.setAttribute('color', '#12122A');
+                    body.setAttribute('emissive', color); body.setAttribute('emissiveIntensity', '0.5');
+
+                    let head = document.createElement('a-sphere');
+                    head.setAttribute('radius', '0.2'); head.setAttribute('position', '0 1.4 0');
+                    head.setAttribute('color', '#12122A'); head.setAttribute('emissive', color);
+                    head.setAttribute('emissiveIntensity', '0.8');
+
+                    person.appendChild(body); person.appendChild(head);
+                    this.el.appendChild(person);
+                }
+            }
+        });
+
+        /* === HUD LOGIC === */
+        window.addEventListener('load', () => {
+            // VR Toggle
+            const scene = document.querySelector('a-scene');
+            const vrBtn = document.getElementById('vr-btn');
+            vrBtn.addEventListener('click', () => {
+                if (scene.is('vr-mode')) {
+                    scene.exitVR();
+                    vrBtn.innerText = "Enter VR Mode";
+                } else {
+                    scene.enterVR();
+                    vrBtn.innerText = "Exit VR Mode";
+                }
+            });
+
+            // Minimap Drawer
+            const canvas = document.getElementById('minimap-canvas');
+            const ctx = canvas.getContext('2d');
+            const rig = document.querySelector('#rig');
+            let blink = false;
+
+            setInterval(() => {
+                blink = !blink;
+                ctx.fillStyle = '#0a0a2e';
+                ctx.fillRect(0, 0, 180, 160);
+
+                // Map Math (Arena bounds x: -50 to 50, z: -95 to 75)
+                const mapX = (x) => (x + 50) * 1.6 + 10;
+                const mapZ = (z) => (z + 95) * 0.8 + 10;
+
+                // Arena Outline
+                ctx.strokeStyle = '#2BD2FF'; ctx.strokeRect(10, 10, 160, 136);
+
+                // Stage
+                ctx.fillStyle = '#FF3CAC'; ctx.fillRect(mapX(-15), mapZ(-95), 48, 10);
+
+                // Zones
+                const drawZone = (x, z, c) => { ctx.fillStyle = c; ctx.fillRect(mapX(x)-3, mapZ(z)-3, 6, 6); }
+                drawZone(-30, 20, '#2BD2FF'); drawZone(30, 10, '#FFD93D'); drawZone(-25, -10, '#FF3CAC');
+                drawZone(28, -30, '#FFD93D'); drawZone(-20, -50, '#52FA7C'); drawZone(20, -55, '#2BD2FF'); drawZone(0, -60, '#52FA7C');
+
+                // Player Dot
+                if(rig && blink) {
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.beginPath();
+                    ctx.arc(mapX(rig.object3D.position.x), mapZ(rig.object3D.position.z), 3, 0, 2*Math.PI);
+                    ctx.fill();
+                }
+            }, 300);
+        });
+
+        function teleportTo(coords) {
+            document.querySelector('#rig').setAttribute('position', coords);
+            document.getElementById('zone-directory').style.display = 'none';
         }
-      });
-
-      // ============================================================
-      // PLAYER STATE COMPONENT (ticket, wristband, security cleared)
-      // ============================================================
-      AFRAME.registerComponent("player-state", {
-        schema: {
-          hasTicket: { type: "boolean", default: false },
-          hasWristband: { type: "boolean", default: false },
-          clearedSecurity: { type: "boolean", default: false },
-          wristbandType: { type: "string", default: "" },
-        },
-      });
-
-      function updateStatusBoard(message) {
-        const boardText = document.querySelector("#status-text");
-        if (!boardText) return;
-        boardText.setAttribute("text", "value", message);
-      }
-
-      function playAmbientAudio() {
-        const concert = document.querySelector("#concert-track");
-        const crowd = document.querySelector("#crowd-ambience");
-        if (concert && concert.paused) {
-          concert.loop = true;
-          concert.volume = 0.75;
-          concert.play().catch(() => {});
-        }
-        if (crowd && crowd.paused) {
-          crowd.loop = true;
-          crowd.volume = 0.4;
-          crowd.play().catch(() => {});
-        }
-      }
-
-      function setHUDMode(mode) {
-        const hud = document.getElementById("hud");
-        if (!hud) return;
-        if (mode === "desktop") {
-          hud.innerHTML =
-            '<strong>Desktop mode:</strong> Use WASD + mouse to move and look. Click on objects to interact.';
-        } else if (mode === "vr") {
-          hud.innerHTML =
-            '<strong>VR mode (Quest):</strong> Use thumbsticks / teleport to move. Reach out with hands or controllers to grab and interact.';
-        }
-      }
-
-      // ============================================================
-      // INTERACTION: PICK UP TICKET
-      // ============================================================
-      AFRAME.registerComponent("pickup-ticket", {
-        init: function () {
-          const el = this.el;
-          const rig = document.querySelector("#player-rig");
-          if (!rig) return;
-
-          const markTicketCollected = () => {
-            const state = rig.getAttribute("player-state") || {};
-            if (state.hasTicket) return;
-
-            rig.setAttribute("player-state", "hasTicket", true);
-            el.setAttribute("visible", false);
-            updateStatusBoard(
-              "Ticket collected.\nNext: Move to the WRISTBAND ZONE (orange) on the right."
-            );
-          };
-
-          // Use super-hands events (grab-start) for hand interaction
-          el.addEventListener("grab-start", markTicketCollected);
-          // Also allow simple click (desktop or controller trigger)
-          el.addEventListener("click", markTicketCollected);
-        },
-      });
-
-      // ============================================================
-      // INTERACTION: PICK UP WRISTBAND (4 types)
-      // ============================================================
-      AFRAME.registerComponent("pickup-wristband", {
-        schema: {
-          bandType: { type: "string", default: "" }, // standing, gold, platinum, vip
-        },
-        init: function () {
-          const el = this.el;
-          const rig = document.querySelector("#player-rig");
-          if (!rig) return;
-
-          const markWristbandCollected = () => {
-            const state = rig.getAttribute("player-state") || {};
-            if (state.hasWristband) return;
-
-            // Hide all other wristbands, keep only the selected one visible
-            const allBands = document.querySelectorAll("[pickup-wristband]");
-            allBands.forEach((bandEl) => {
-              bandEl.setAttribute("visible", bandEl === el);
-            });
-
-            const bandType = this.data.bandType || "standing";
-            rig.setAttribute("player-state", "hasWristband", true);
-            rig.setAttribute("player-state", "wristbandType", bandType);
-
-            // Move a persona forward towards the security check
-            const persona = document.querySelector("#persona");
-            if (persona) {
-              persona.emit("persona-go", { bandType });
-            }
-
-            let tierLabel = "Standing (Floor)";
-            if (bandType === "gold") tierLabel = "Gold Seating";
-            if (bandType === "platinum") tierLabel = "Platinum Seating";
-            if (bandType === "vip") tierLabel = "VIP Seating";
-
-            let nextMessage = `Wristband selected: ${tierLabel}.\nNext: Queue at SECURITY with ticket + wristband.`;
-            if (!state.hasTicket) {
-              nextMessage =
-                "Wristband selected.\nYou still need a TICKET from the ticket stand on the left.";
-            }
-            updateStatusBoard(nextMessage);
-          };
-
-          // Pinch / grab with right hand or controller
-          el.addEventListener("grab-start", markWristbandCollected);
-          // Desktop / mouse click
-          el.addEventListener("click", markWristbandCollected);
-          // Programmatic selection (right-hand pinch selector dispatches this)
-          el.addEventListener("wristband-select", markWristbandCollected);
-        },
-      });
-
-      // ============================================================
-      // SECURITY GATE LOGIC (checks that player has ticket + wristband)
-      // ============================================================
-      AFRAME.registerComponent("security-gate", {
-        init: function () {
-          this.playerRig = document.querySelector("#player-rig");
-          this.gate = document.querySelector("#security-gate");
-          this.opened = false;
-
-          if (!this.gate) return;
-
-          const tryOpen = () => {
-            if (this.opened || !this.playerRig) return;
-
-            const state = this.playerRig.getAttribute("player-state") || {};
-            if (state.hasTicket && state.hasWristband) {
-              this.openGate();
-            } else {
-              this.showDenied();
-            }
-          };
-
-          // Trigger when hands hover or user clicks on the gate
-          this.gate.addEventListener("hover-start", tryOpen);
-          this.gate.addEventListener("click", tryOpen);
-        },
-
-        openGate: function () {
-          if (!this.gate || this.opened) return;
-          this.opened = true;
-          this.playerRig.setAttribute("player-state", "clearedSecurity", true);
-
-          // Animate the gate sliding upwards to "open"
-          this.gate.setAttribute("animation__open", {
-            property: "position",
-            to: "0 3 -1.2",
-            dur: 900,
-            easing: "easeOutQuad",
-          });
-          this.gate.setAttribute("material", "color", "#22c55e");
-          this.gate.setAttribute("material", "emissive", "#22c55e");
-          this.gate.setAttribute("material", "emissiveIntensity", 0.95);
-
-          updateStatusBoard(
-            "Security cleared.\nFollow the BLUE path into the 360° arena and choose a SECTION (A–D)."
-          );
-        },
-
-        showDenied: function () {
-          if (!this.gate) return;
-          this.gate.setAttribute("material", "color", "#ef4444");
-          this.gate.setAttribute("material", "emissive", "#ef4444");
-          this.gate.setAttribute("material", "emissiveIntensity", 0.9);
-          updateStatusBoard(
-            "You must have BOTH a ticket and wristband before entering security.\nCollect them at the TICKET and WRISTBAND zones."
-          );
-        },
-      });
-
-      // ============================================================
-      // OPTIONAL: SNAP PLAYER A LITTLE FORWARD WHEN SECURITY CLEARED
-      // ============================================================
-      AFRAME.registerComponent("auto-step-forward", {
-        schema: { distance: { type: "number", default: 3 } },
-        init: function () {
-          const rig = document.querySelector("#player-rig");
-          if (!rig) return;
-
-          this.rig = rig;
-          this.hasStepped = false;
-
-          rig.addEventListener("componentchanged", (evt) => {
-            if (evt.detail.name !== "player-state" || this.hasStepped) return;
-            const state = rig.getAttribute("player-state") || {};
-            if (state.clearedSecurity && !this.hasStepped) {
-              this.stepIntoArena();
-            }
-          });
-        },
-        stepIntoArena: function () {
-          if (!this.rig || this.hasStepped) return;
-          this.hasStepped = true;
-
-          const pos = this.rig.getAttribute("position");
-          const newPos = {
-            x: pos.x,
-            y: pos.y,
-            z: pos.z - this.data.distance,
-          };
-
-          this.rig.setAttribute("animation__step", {
-            property: "position",
-            to: `${newPos.x} ${newPos.y} ${newPos.z}`,
-            dur: 800,
-            easing: "easeOutQuad",
-          });
-        },
-      });
-
-      // ============================================================
-      // CONTROL PROFILE (switch between desktop and VR-focused controls)
-      // ============================================================
-      AFRAME.registerComponent("control-profile", {
-        schema: {
-          mode: { type: "string", default: "desktop" },
-        },
-        init: function () {
-          this.scene = this.el.sceneEl;
-          this.desktopReticle = document.querySelector("#desktop-reticle");
-          setHUDMode(this.data.mode);
-
-          // Auto-switch based on entering/exiting VR
-          if (this.scene) {
-            this.scene.addEventListener("enter-vr", () => {
-              this.el.setAttribute("control-profile", "mode", "vr");
-            });
-            this.scene.addEventListener("exit-vr", () => {
-              this.el.setAttribute("control-profile", "mode", "desktop");
-            });
-          }
-        },
-        update: function () {
-          const mode = this.data.mode;
-          const scene = this.scene || this.el.sceneEl;
-          if (!scene) return;
-
-          setHUDMode(mode);
-
-          if (this.desktopReticle) {
-            const enable = mode === "desktop";
-            this.desktopReticle.setAttribute("visible", enable);
-            this.desktopReticle.setAttribute("cursor", "enabled", enable);
-            this.desktopReticle.setAttribute("raycaster", "enabled", enable);
-          }
-        },
-      });
-
-      // Simple component to attach to settings buttons
-      AFRAME.registerComponent("control-switch", {
-        schema: {
-          mode: { type: "string", default: "desktop" },
-        },
-        init: function () {
-          const el = this.el;
-          el.addEventListener("click", () => {
-            const rig = document.querySelector("#player-rig");
-            if (!rig) return;
-            rig.setAttribute("control-profile", "mode", this.data.mode);
-          });
-        },
-      });
-
-      // ============================================================
-      // RIGHT HAND PINCH SELECTOR (Quest hand-tracking)
-      // ============================================================
-      AFRAME.registerComponent("right-hand-pinch-selector", {
-        schema: {
-          targets: { type: "string", default: "[pickup-wristband]" },
-          maxDistance: { type: "number", default: 0.28 },
-        },
-        init: function () {
-          this._onPinch = this.onPinch.bind(this);
-          // A-Frame hand-tracking-controls commonly emits pinchstarted/pinchended.
-          this.el.addEventListener("pinchstarted", this._onPinch);
-          this.el.addEventListener("pinchstart", this._onPinch);
-        },
-        onPinch: function () {
-          const scene = this.el.sceneEl;
-          if (!scene) return;
-
-          const handWorld = new THREE.Vector3();
-          const bandWorld = new THREE.Vector3();
-          this.el.object3D.getWorldPosition(handWorld);
-
-          let closest = null;
-          let closestD = Infinity;
-
-          const bands = scene.querySelectorAll(this.data.targets);
-          bands.forEach((bandEl) => {
-            if (!bandEl || bandEl.getAttribute("visible") === false) return;
-            bandEl.object3D.getWorldPosition(bandWorld);
-            const d = handWorld.distanceTo(bandWorld);
-            if (d < closestD) {
-              closestD = d;
-              closest = bandEl;
-            }
-          });
-
-          if (closest && closestD <= this.data.maxDistance) {
-            closest.emit("wristband-select");
-          }
-        },
-      });
-
-      // ============================================================
-      // PERSONA QUEUE (spawns at wristband station and walks to queue)
-      // ============================================================
-      AFRAME.registerComponent("persona-queue", {
-        init: function () {
-          this.body = this.el.querySelector("#persona-body");
-          this.wristbandZone = document.querySelector("#wristband-zone");
-          this.securityZone = document.querySelector("#security-zone");
-
-          this.el.addEventListener("persona-go", (evt) => {
-            const bandType = evt?.detail?.bandType || "standing";
-            const colorByType = {
-              standing: "#22c55e",
-              gold: "#fb923c",
-              platinum: "#d946ef",
-              vip: "#ef4444",
-            };
-            const c = colorByType[bandType] || "#22c55e";
-            if (this.body) {
-              this.body.setAttribute("color", c);
-              this.body.setAttribute("material", `transparent: true; alphaTest: 0.5; emissive: ${c}; emissiveIntensity: 0.35`);
-            }
-
-            const start = new THREE.Vector3(-2.5, 0, 22);
-            if (this.wristbandZone) {
-              this.wristbandZone.object3D.getWorldPosition(start);
-            }
-
-            // Queue start point (just behind the lanes)
-            const queue = new THREE.Vector3(0, 0, 16.2);
-            if (this.securityZone) {
-              this.securityZone.object3D.getWorldPosition(queue);
-              queue.z += 1.2;
-            }
-
-            this.el.setAttribute("visible", true);
-            this.el.setAttribute("position", `${start.x} 0 ${start.z}`);
-
-            // Walk animation (position)
-            this.el.setAttribute("animation__walk", {
-              property: "position",
-              to: `${queue.x} 0 ${queue.z}`,
-              dur: 2400,
-              easing: "easeInOutSine",
-            });
-
-            // Subtle bobbing while walking
-            this.el.setAttribute("animation__bob", {
-              property: "position.y",
-              dir: "alternate",
-              from: 0,
-              to: 0.03,
-              dur: 350,
-              loop: true,
-              easing: "easeInOutSine",
-            });
-          });
-        },
-      });
-
-      // ============================================================
-      // CROWD SPAWNER (Uses 2D Human Silhouette Billboards)
-      // ============================================================
-      AFRAME.registerComponent("spawn-crowd", {
-        init: function () {
-          // Human silhouette SVG converted to a Data URI
-          const humanSVG = "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 512'%3E%3Cpath fill='%23ffffff' d='M112 48a48 48 0 1 1 96 0 48 48 0 1 1 -96 0zm40 304V480c0 17.7-14.3 32-32 32s-32-14.3-32-32V256.9L59.4 304.5c-9.1 15.1-28.8 20-43.9 10.9s-20-28.8-10.9-43.9l58.3-97c17.4-28.9 48.6-46.6 82.3-46.6h29.7c33.7 0 64.9 17.7 82.3 46.6l58.3 97c9.1 15.1 4.2 34.8-10.9 43.9s-34.8 4.2-43.9-10.9L232 256.9V480c0 17.7-14.3 32-32 32s-32-14.3-32-32V352H152z'/%3E%3C/svg%3E";
-
-          const tiers = [
-            { name: "standing", count: 40, rMin: 6.2, rMax: 8.2, color: "#22c55e" },
-            { name: "gold", count: 35, rMin: 9.2, rMax: 11.2, color: "#fb923c" },
-            { name: "platinum", count: 30, rMin: 12.2, rMax: 14.2, color: "#d946ef" },
-            { name: "vip", count: 22, rMin: 14.8, rMax: 16.2, color: "#ef4444" },
-          ];
-
-          let seed = 1337;
-          const rand = () => {
-            seed = (seed * 16807) % 2147483647;
-            return (seed - 1) / 2147483646;
-          };
-
-          tiers.forEach((tier) => {
-            for (let i = 0; i < tier.count; i++) {
-              const theta = rand() * Math.PI * 2;
-              const r = tier.rMin + rand() * (tier.rMax - tier.rMin);
-              const x = Math.cos(theta) * r;
-              const z = Math.sin(theta) * r;
-
-              const person = document.createElement("a-image");
-              person.setAttribute("src", humanSVG);
-              person.setAttribute("width", "0.9");
-              person.setAttribute("height", "1.7");
-              person.setAttribute("position", `${x} 0.85 ${z}`); 
-              person.setAttribute("color", tier.color);
-              person.setAttribute("material", `transparent: true; alphaTest: 0.5; emissive: ${tier.color}; emissiveIntensity: 0.4`);
-              person.setAttribute("billboard", ""); 
-
-              // Subtle bobbing to feel alive
-              person.setAttribute("animation__bob", {
-                property: "position",
-                dir: "alternate",
-                from: `${x} 0.85 ${z}`,
-                to: `${x} 0.88 ${z}`,
-                dur: 1200 + rand() * 800,
-                loop: true,
-                easing: "easeInOutSine",
-              });
-
-              this.el.appendChild(person);
-            }
-          });
-        },
-      });
-
-      // Attach auto-step-forward behavior to the scene after components are defined
-      document.addEventListener("DOMContentLoaded", function () {
-        const pbWoff = "assets/fonts/PointBlank.woff";
-        fetch(pbWoff, { method: "HEAD" })
-          .then((r) => {
-            if (!r.ok) throw new Error("Font not found");
-            const texts = document.querySelectorAll("[troika-text]");
-            texts.forEach((el) => {
-              el.setAttribute("troika-text", "font", pbWoff);
-            });
-          })
-          .catch(() => {});
-
-        const rig = document.querySelector("#player-rig");
-        if (rig && !rig.hasAttribute("auto-step-forward")) {
-          rig.setAttribute("auto-step-forward", "distance: 3");
-        }
-      });
     </script>
-  </body>
+</head>
+<body>
+
+    <div id="top-bar" class="ui-panel">
+        <div id="top-title">CONCERT ARENA</div>
+        <div id="top-live">LIVE TONIGHT</div>
+    </div>
+
+    <button id="vr-btn" class="ui-panel">Enter VR Mode</button>
+
+    <div id="minimap-container" class="ui-panel">
+        <div id="minimap-label">MAP</div>
+        <canvas id="minimap-canvas" width="180" height="160"></canvas>
+    </div>
+
+    <div id="zone-directory" class="ui-panel">
+        <h2>ZONE GUIDE</h2>
+        <div class="zone-row"><span class="zone-name">1. CHECK-IN</span> <button class="go-btn" onclick="teleportTo('-30 1.6 20')">GO</button></div>
+        <div class="zone-row"><span class="zone-name">2. SPONSORS</span> <button class="go-btn" onclick="teleportTo('30 1.6 10')">GO</button></div>
+        <div class="zone-row"><span class="zone-name">3. PHOTO BOOTH</span> <button class="go-btn" onclick="teleportTo('-25 1.6 -10')">GO</button></div>
+        <div class="zone-row"><span class="zone-name">4. FOOD & DRINKS</span> <button class="go-btn" onclick="teleportTo('28 1.6 -30')">GO</button></div>
+        <div class="zone-row"><span class="zone-name">5. ART MARKET</span> <button class="go-btn" onclick="teleportTo('-20 1.6 -50')">GO</button></div>
+        <div class="zone-row"><span class="zone-name">6. LOUNGE</span> <button class="go-btn" onclick="teleportTo('20 1.6 -55')">GO</button></div>
+        <div class="zone-row"><span class="zone-name">7. EXHIBITION</span> <button class="go-btn" onclick="teleportTo('0 1.6 -60')">GO</button></div>
+        <div class="zone-row" style="border:none;"><span class="zone-name">★ MAIN STAGE</span> <button class="go-btn" onclick="teleportTo('0 1.6 -65')" style="border-color:#FF3CAC; color:#FF3CAC;">GO</button></div>
+    </div>
+
+    <a-scene fog="type: linear; color: #050510; near: 30; far: 120" vr-mode-ui="enabled: false">
+        
+        <a-assets>
+            <img id="grid-texture" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10'%3E%3Crect width='10' height='10' fill='none' stroke='%232BD2FF' stroke-width='0.3' stroke-opacity='0.15'/%3E%3C/svg%3E">
+        </a-assets>
+
+        <a-entity id="rig" position="0 0 70" rotation="0 180 0" movement-controls="speed: 0.15">
+            <a-entity id="camera" camera look-controls position="0 1.6 0">
+                <a-cursor color="#2BD2FF" fuse="false" raycaster="objects: [clickable]"></a-cursor>
+            </a-entity>
+            <a-entity laser-controls="hand: left" teleport-controls="cameraRig: #rig; teleportOrigin: #camera; button: trigger"></a-entity>
+            <a-entity laser-controls="hand: right" teleport-controls="cameraRig: #rig; teleportOrigin: #camera; button: trigger" raycaster="objects: [clickable]"></a-entity>
+        </a-entity>
+
+        <a-sky color="#050510"></a-sky>
+        <a-entity star-system></a-entity>
+        <a-light type="ambient" color="#1a1a3e" intensity="0.4"></a-light>
+        <a-plane position="0 0 -10" rotation="-90 0 0" width="100" height="170" color="#0A0A2E" material="src: #grid-texture; repeat: 100 170"></a-plane>
+
+        -->
+        <a-entity id="walls">
+            <a-box position="0 4 75" width="100" height="8" depth="1" color="#12122A"></a-box>
+            <a-box position="0 8 75" width="100" height="0.2" depth="1.1" color="#12122A" emissive="#FF3CAC" emissiveIntensity="0.8"></a-box>
+
+            <a-box position="0 4 -95" width="100" height="8" depth="1" color="#12122A"></a-box>
+            <a-box position="0 8 -95" width="100" height="0.2" depth="1.1" color="#12122A" emissive="#FF3CAC" emissiveIntensity="0.8"></a-box>
+
+            <a-box position="-51 4 -10" width="1" height="8" depth="170" color="#12122A"></a-box>
+            <a-box position="-51 8 -10" width="1.1" height="0.2" depth="170" color="#12122A" emissive="#2BD2FF" emissiveIntensity="0.8"></a-box>
+
+            <a-box position="51 4 -10" width="1" height="8" depth="170" color="#12122A"></a-box>
+            <a-box position="51 8 -10" width="1.1" height="0.2" depth="170" color="#12122A" emissive="#2BD2FF" emissiveIntensity="0.8"></a-box>
+        </a-entity>
+
+        -->
+        <a-entity id="entry-sequence">
+            <a-box position="-5 3.5 68" width="1.5" height="7" depth="1.5" color="#12122A" emissive="#FF3CAC" emissiveIntensity="0.9"></a-box>
+            <a-box position="5 3.5 68" width="1.5" height="7" depth="1.5" color="#12122A" emissive="#FF3CAC" emissiveIntensity="0.9"></a-box>
+            <a-box position="0 6.5 68" width="11" height="1" depth="1" color="#12122A" emissive="#FF3CAC" emissiveIntensity="0.9"></a-box>
+            <a-text value="WELCOME" color="#FFD93D" align="center" width="12" position="0 8.5 68"></a-text>
+
+            <a-box position="-12 1.5 55" width="5" height="3" depth="3" color="#12122A" emissive="#2BD2FF" emissiveIntensity="0.7"></a-box>
+            <a-box position="-12 0.5 54" width="4" height="1" depth="0.5" color="#1a1a3e"></a-box>
+            <a-text value="TICKET BOOKING" color="#2BD2FF" align="center" width="8" position="-12 4 55" billboard></a-text>
+
+            <a-box position="-5 1.25 50" width="3" height="2.5" depth="2" color="#12122A" emissive="#52FA7C" emissiveIntensity="0.7"></a-box>
+            <a-text value="WRISTBAND" color="#52FA7C" align="center" width="6" position="-5 4 50" billboard></a-text>
+
+            <a-box position="-2.5 2 43" width="0.8" height="4" depth="0.8" color="#12122A"></a-box>
+            <a-box position="2.5 2 43" width="0.8" height="4" depth="0.8" color="#12122A"></a-box>
+            <a-box position="0 4 43" width="6" height="0.5" depth="0.8" color="#12122A"></a-box>
+            
+            <a-sphere id="red-light" radius="0.25" position="-1 4.8 43" color="#FF0000" emissive="#FF0000" emissiveIntensity="1"></a-sphere>
+            <a-sphere id="green-light" radius="0.25" position="1 4.8 43" color="#00FF00" emissive="#00FF00" emissiveIntensity="0"></a-sphere>
+            
+            <a-box class="clickable" scanner-toggle position="3.5 0.75 43" width="0.4" height="1.5" depth="0.4" color="#444" emissive="#2BD2FF" emissiveIntensity="0.4"></a-box>
+            <a-text value="SECURITY CHECK" color="#FF3CAC" align="center" position="0 5.5 43" billboard></a-text>
+        </a-entity>
+
+        -->
+        <a-entity arrow-path></a-entity>
+        
+        <a-entity kiosk-proximity position="5 1 35">
+            <a-box width="1" height="2" depth="0.3" color="#12122A" emissive="#2BD2FF" emissiveIntensity="0.5"></a-box>
+            <a-plane position="0 0 -0.16" rotation="0 180 0" width="0.9" height="1.2" color="#000" emissive="#2BD2FF" emissiveIntensity="0.3"></a-plane>
+            <a-text value="ZONE GUIDE" color="#2BD2FF" align="center" position="0 0.4 -0.17" rotation="0 180 0" width="3"></a-text>
+        </a-entity>
+
+        -->
+        <a-entity id="main-arena">
+            
+            <a-entity position="-30 1.25 20">
+                <a-box position="-3.1 0 0" width="3" height="2.5" depth="2" color="#12122A" emissive="#2BD2FF" emissiveIntensity="0.6"></a-box>
+                <a-box position="0 0 0" width="3" height="2.5" depth="2" color="#12122A" emissive="#2BD2FF" emissiveIntensity="0.6"></a-box>
+                <a-box position="3.1 0 0" width="3" height="2.5" depth="2" color="#12122A" emissive="#2BD2FF" emissiveIntensity="0.6"></a-box>
+                <a-entity position="0 3 0" billboard>
+                    <a-circle radius="0.6" position="-2 0 0" color="#FFD93D" emissive="#FFD93D" emissiveIntensity="0.5"><a-text value="1" color="#000" align="center" width="8" position="0 0 0.05"></a-text></a-circle>
+                    <a-text value="CHECK-IN" color="#2BD2FF" width="10" position="-1 0 0"></a-text>
+                </a-entity>
+            </a-entity>
+
+            <a-entity position="30 2 10">
+                <a-plane rotation="0 -90 0" width="15" height="4" color="#12122A"></a-plane>
+                <a-box position="-0.1 0 -5" width="0.1" height="3" depth="2" color="#000" emissive="#FF3CAC" emissiveIntensity="0.8"></a-box>
+                <a-box position="-0.1 0 -1.5" width="0.1" height="3" depth="2" color="#000" emissive="#2BD2FF" emissiveIntensity="0.8"></a-box>
+                <a-box position="-0.1 0 2" width="0.1" height="3" depth="2" color="#000" emissive="#52FA7C" emissiveIntensity="0.8"></a-box>
+                <a-box position="-0.1 0 5.5" width="0.1" height="3" depth="2" color="#000" emissive="#FFD93D" emissiveIntensity="0.8"></a-box>
+                <a-entity position="0 3.5 0" billboard>
+                    <a-circle radius="0.6" position="-2 0 0" color="#FFD93D" emissive="#FFD93D" emissiveIntensity="0.5"><a-text value="2" color="#000" align="center" width="8" position="0 0 0.05"></a-text></a-circle>
+                    <a-text value="SPONSORS" color="#FFD93D" width="10" position="-1 0 0"></a-text>
+                </a-entity>
+            </a-entity>
+
+            <a-entity position="-25 2 -10">
+                <a-box position="-2 0 0" width="0.2" height="4" depth="0.2" color="#000" emissive="#FF3CAC" emissiveIntensity="1"></a-box>
+                <a-box position="2 0 0" width="0.2" height="4" depth="0.2" color="#000" emissive="#FF3CAC" emissiveIntensity="1"></a-box>
+                <a-box position="0 2 0" width="4" height="0.2" depth="0.2" color="#000" emissive="#FF3CAC" emissiveIntensity="1"></a-box>
+                <a-entity position="0 3 0" billboard>
+                    <a-circle radius="0.6" position="-3 0 0" color="#FFD93D" emissive="#FFD93D" emissiveIntensity="0.5"><a-text value="3" color="#000" align="center" width="8" position="0 0 0.05"></a-text></a-circle>
+                    <a-text value="PHOTO BOOTH" color="#FF3CAC" width="10" position="-2 0 0"></a-text>
+                </a-entity>
+            </a-entity>
+
+            <a-entity position="28 1.25 -30">
+                <a-box position="-3.5 0 0" width="3" height="2.5" depth="3" color="#12122A" emissive="#FFD93D" emissiveIntensity="0.5"></a-box>
+                <a-box position="0 0 0" width="3" height="2.5" depth="3" color="#12122A" emissive="#FFD93D" emissiveIntensity="0.5"></a-box>
+                <a-box position="3.5 0 0" width="3" height="2.5" depth="3" color="#12122A" emissive="#FFD93D" emissiveIntensity="0.5"></a-box>
+                <a-entity position="0 3 0" billboard>
+                    <a-circle radius="0.6" position="-3 0 0" color="#FFD93D" emissive="#FFD93D" emissiveIntensity="0.5"><a-text value="4" color="#000" align="center" width="8" position="0 0 0.05"></a-text></a-circle>
+                    <a-text value="FOOD & DRINKS" color="#FFD93D" width="10" position="-2 0 0"></a-text>
+                </a-entity>
+            </a-entity>
+
+            <a-entity position="-20 1 -50">
+                <a-box position="-3 0 -2" width="2" height="2" depth="2" color="#12122A" emissive="#FF3CAC" emissiveIntensity="0.6"></a-box>
+                <a-box position="0 0 2" width="2" height="2" depth="2" color="#12122A" emissive="#2BD2FF" emissiveIntensity="0.6"></a-box>
+                <a-box position="3 0 -1" width="2" height="2" depth="2" color="#12122A" emissive="#52FA7C" emissiveIntensity="0.6"></a-box>
+                <a-entity position="0 3 0" billboard>
+                    <a-circle radius="0.6" position="-2.5 0 0" color="#FFD93D" emissive="#FFD93D" emissiveIntensity="0.5"><a-text value="5" color="#000" align="center" width="8" position="0 0 0.05"></a-text></a-circle>
+                    <a-text value="ART MARKET" color="#52FA7C" width="10" position="-1.5 0 0"></a-text>
+                </a-entity>
+            </a-entity>
+
+            <a-entity position="20 0.25 -55">
+                <a-box position="-2 0 2" width="1" height="0.5" depth="1" color="#12122A" emissive="#2BD2FF" emissiveIntensity="0.5"></a-box>
+                <a-box position="2 0 2" width="1" height="0.5" depth="1" color="#12122A" emissive="#2BD2FF" emissiveIntensity="0.5"></a-box>
+                <a-box position="-3 0 0" width="1" height="0.5" depth="1" color="#12122A" emissive="#2BD2FF" emissiveIntensity="0.5"></a-box>
+                <a-box position="3 0 0" width="1" height="0.5" depth="1" color="#12122A" emissive="#2BD2FF" emissiveIntensity="0.5"></a-box>
+                <a-box position="-2 0 -2" width="1" height="0.5" depth="1" color="#12122A" emissive="#2BD2FF" emissiveIntensity="0.5"></a-box>
+                <a-box position="2 0 -2" width="1" height="0.5" depth="1" color="#12122A" emissive="#2BD2FF" emissiveIntensity="0.5"></a-box>
+                <a-entity position="0 3.75 0" billboard>
+                    <a-circle radius="0.6" position="-2 0 0" color="#FFD93D" emissive="#FFD93D" emissiveIntensity="0.5"><a-text value="6" color="#000" align="center" width="8" position="0 0 0.05"></a-text></a-circle>
+                    <a-text value="LOUNGE" color="#2BD2FF" width="10" position="-1 0 0"></a-text>
+                </a-entity>
+            </a-entity>
+
+            <a-entity position="0 2 -60">
+                <a-box position="-5 0 0" width="0.2" height="4" depth="8" color="#0A0A2E" emissive="#52FA7C" emissiveIntensity="0.3"></a-box>
+                <a-box position="5 0 0" width="0.2" height="4" depth="8" color="#0A0A2E" emissive="#52FA7C" emissiveIntensity="0.3"></a-box>
+                <a-box position="0 0 -4" width="10" height="4" depth="0.2" color="#0A0A2E" emissive="#52FA7C" emissiveIntensity="0.3"></a-box>
+                <a-box position="-3.5 0 4" width="3" height="4" depth="0.2" color="#0A0A2E" emissive="#52FA7C" emissiveIntensity="0.3"></a-box>
+                <a-box position="3.5 0 4" width="3" height="4" depth="0.2" color="#0A0A2E" emissive="#52FA7C" emissiveIntensity="0.3"></a-box>
+                <a-entity position="0 3 4.5" billboard>
+                    <a-circle radius="0.6" position="-2.5 0 0" color="#FFD93D" emissive="#FFD93D" emissiveIntensity="0.5"><a-text value="7" color="#000" align="center" width="8" position="0 0 0.05"></a-text></a-circle>
+                    <a-text value="EXHIBITION" color="#52FA7C" width="10" position="-1.5 0 0"></a-text>
+                </a-entity>
+            </a-entity>
+
+        </a-entity>
+
+        -->
+        <a-entity id="main-stage">
+            <a-box position="0 0.5 -88" width="30" height="1" depth="12" color="#1a1a3a" emissive="#FF3CAC" emissiveIntensity="0.4"></a-box>
+            <a-plane position="0 7 -94" width="28" height="12" color="#FFFFFF" emissive="#2BD2FF" emissiveIntensity="1"></a-plane>
+
+            <a-box position="-16 3 -88" width="2" height="6" depth="2" color="#000" emissive="#2BD2FF" emissiveIntensity="0.6"></a-box>
+            <a-box position="16 3 -88" width="2" height="6" depth="2" color="#000" emissive="#2BD2FF" emissiveIntensity="0.6"></a-box>
+
+            <a-light type="spot" position="0 15 -85" target="#stage-center" color="#FF3CAC" intensity="2" angle="30" penumbra="0.5"></a-light>
+            <a-light type="spot" position="-8 15 -85" target="#stage-center" color="#2BD2FF" intensity="1.5" angle="40" penumbra="0.5"></a-light>
+            <a-light type="spot" position="8 15 -85" target="#stage-center" color="#FFD93D" intensity="1.5" angle="40" penumbra="0.5"></a-light>
+            <a-entity id="stage-center" position="0 0 -88"></a-entity>
+
+            <a-box position="0 0.1 -81.5" width="6" height="0.2" depth="1" color="#12122A" emissive="#FF3CAC" emissiveIntensity="0.4"></a-box>
+            <a-box position="0 0.3 -82.5" width="6" height="0.2" depth="1" color="#12122A" emissive="#FF3CAC" emissiveIntensity="0.4"></a-box>
+
+            <a-entity crowd-system></a-entity>
+        </a-entity>
+
+    </a-scene>
+</body>
 </html>
