@@ -10,7 +10,7 @@
 
     <style>
         /* === UI OVERLAYS & STYLING === */
-        body, html { margin: 0; padding: 0; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body, html { margin: 0; padding: 0; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #050510; }
         
         .ui-panel {
             position: fixed;
@@ -77,6 +77,21 @@
         #minimap-label { color: #2BD2FF; font-size: 12px; font-weight: bold; margin-bottom: 5px; letter-spacing: 2px;}
         #minimap-canvas { background: #0a0a2e; border-radius: 4px; }
 
+        /* Bottom Center: Navigation Instructions */
+        #nav-instructions {
+            bottom: 20px; left: 50%;
+            transform: translateX(-50%);
+            border: 1px solid #52FA7C;
+            border-radius: 8px;
+            padding: 10px 20px;
+            color: #52FA7C;
+            font-size: 14px;
+            text-align: center;
+            box-shadow: 0 0 10px rgba(82, 250, 124, 0.2);
+            text-shadow: 0 0 5px #52FA7C;
+            pointer-events: none; /* Let clicks pass through to canvas */
+        }
+
         /* Center: Zone Directory Panel */
         #zone-directory {
             top: 50%; left: 50%;
@@ -106,11 +121,21 @@
     <script>
         /* === CUSTOM A-FRAME COMPONENTS === */
 
-        // 1. Billboard: Makes entity face the camera
+        // 1. Billboard: Makes entity face the camera (FIXED: Added safety checks & World Position)
         AFRAME.registerComponent('billboard', {
             tick: function () {
-                var camera = document.querySelector('#camera').object3D;
-                this.el.object3D.lookAt(camera.position);
+                var cameraEl = document.querySelector('#camera');
+                if (!cameraEl || !cameraEl.object3D) return; // Wait until camera is fully loaded
+                
+                var target = new THREE.Vector3();
+                cameraEl.object3D.getWorldPosition(target);
+                
+                // Keep text upright by forcing the Y position to match the sign's Y position
+                var myPos = new THREE.Vector3();
+                this.el.object3D.getWorldPosition(myPos);
+                target.y = myPos.y; 
+                
+                this.el.object3D.lookAt(target);
             }
         });
 
@@ -128,16 +153,24 @@
             }
         });
 
-        // 3. Kiosk Proximity: Show HTML Panel if within 4m
+        // 3. Kiosk Proximity: Show HTML Panel if within 4m (FIXED: Added safety checks)
         AFRAME.registerComponent('kiosk-proximity', {
             tick: function () {
-                let rig = document.querySelector('#rig').object3D;
+                let rigEl = document.querySelector('#rig');
+                if (!rigEl || !rigEl.object3D) return; // Wait until rig is fully loaded
+                
+                let rig = rigEl.object3D;
                 let kiosk = this.el.object3D;
                 let distance = rig.position.distanceTo(kiosk.position);
                 let panel = document.getElementById('zone-directory');
                 
+                // Show panel if close, hide if far
                 if (distance < 4 && panel.style.display !== 'block') {
                     panel.style.display = 'block';
+                    // Only attempt to unlock mouse if it's currently locked
+                    if (document.pointerLockElement) {
+                        document.exitPointerLock(); 
+                    }
                 } else if (distance >= 5 && panel.style.display === 'block') {
                     panel.style.display = 'none';
                 }
@@ -256,16 +289,17 @@
                 drawZone(-30, 20, '#2BD2FF'); drawZone(30, 10, '#FFD93D'); drawZone(-25, -10, '#FF3CAC');
                 drawZone(28, -30, '#FFD93D'); drawZone(-20, -50, '#52FA7C'); drawZone(20, -55, '#2BD2FF'); drawZone(0, -60, '#52FA7C');
 
-                // Player Dot
-                if(rig && blink) {
+                // Player Dot (FIXED: Added safety check for rig.object3D)
+                if(rig && rig.object3D && blink) {
                     ctx.fillStyle = '#FFFFFF';
                     ctx.beginPath();
-                    ctx.arc(mapX(rig.object3D.position.x), mapZ(rig.object3D.position.z), 3, 0, 2*Math.PI);
+                    ctx.arc(mapX(rig.object3D.position.x), mapZ(rig.object3D.position.z), 4, 0, 2*Math.PI);
                     ctx.fill();
                 }
             }, 300);
         });
 
+        // Directory Teleport Logic
         function teleportTo(coords) {
             document.querySelector('#rig').setAttribute('position', coords);
             document.getElementById('zone-directory').style.display = 'none';
@@ -286,38 +320,46 @@
         <canvas id="minimap-canvas" width="180" height="160"></canvas>
     </div>
 
-    <div id="zone-directory" class="ui-panel">
-        <h2>ZONE GUIDE</h2>
-        <div class="zone-row"><span class="zone-name">1. CHECK-IN</span> <button class="go-btn" onclick="teleportTo('-30 1.6 20')">GO</button></div>
-        <div class="zone-row"><span class="zone-name">2. SPONSORS</span> <button class="go-btn" onclick="teleportTo('30 1.6 10')">GO</button></div>
-        <div class="zone-row"><span class="zone-name">3. PHOTO BOOTH</span> <button class="go-btn" onclick="teleportTo('-25 1.6 -10')">GO</button></div>
-        <div class="zone-row"><span class="zone-name">4. FOOD & DRINKS</span> <button class="go-btn" onclick="teleportTo('28 1.6 -30')">GO</button></div>
-        <div class="zone-row"><span class="zone-name">5. ART MARKET</span> <button class="go-btn" onclick="teleportTo('-20 1.6 -50')">GO</button></div>
-        <div class="zone-row"><span class="zone-name">6. LOUNGE</span> <button class="go-btn" onclick="teleportTo('20 1.6 -55')">GO</button></div>
-        <div class="zone-row"><span class="zone-name">7. EXHIBITION</span> <button class="go-btn" onclick="teleportTo('0 1.6 -60')">GO</button></div>
-        <div class="zone-row" style="border:none;"><span class="zone-name">★ MAIN STAGE</span> <button class="go-btn" onclick="teleportTo('0 1.6 -65')" style="border-color:#FF3CAC; color:#FF3CAC;">GO</button></div>
+    <div id="nav-instructions" class="ui-panel">
+        <b>DESKTOP:</b> Click screen to lock mouse. Use <b>W A S D</b> to walk. Press <b>ESC</b> for menus.
     </div>
 
+    <div id="zone-directory" class="ui-panel">
+        <h2>ZONE GUIDE</h2>
+        <div class="zone-row"><span class="zone-name">1. CHECK-IN</span> <button class="go-btn" onclick="teleportTo('-30 0 20')">GO</button></div>
+        <div class="zone-row"><span class="zone-name">2. SPONSORS</span> <button class="go-btn" onclick="teleportTo('30 0 10')">GO</button></div>
+        <div class="zone-row"><span class="zone-name">3. PHOTO BOOTH</span> <button class="go-btn" onclick="teleportTo('-25 0 -10')">GO</button></div>
+        <div class="zone-row"><span class="zone-name">4. FOOD & DRINKS</span> <button class="go-btn" onclick="teleportTo('28 0 -30')">GO</button></div>
+        <div class="zone-row"><span class="zone-name">5. ART MARKET</span> <button class="go-btn" onclick="teleportTo('-20 0 -50')">GO</button></div>
+        <div class="zone-row"><span class="zone-name">6. LOUNGE</span> <button class="go-btn" onclick="teleportTo('20 0 -55')">GO</button></div>
+        <div class="zone-row"><span class="zone-name">7. EXHIBITION</span> <button class="go-btn" onclick="teleportTo('0 0 -60')">GO</button></div>
+        <div class="zone-row" style="border:none;"><span class="zone-name">★ MAIN STAGE</span> <button class="go-btn" onclick="teleportTo('0 0 -65')" style="border-color:#FF3CAC; color:#FF3CAC;">GO</button></div>
+    </div>
+
+    <!-- === A-FRAME SCENE === -->
     <a-scene fog="type: linear; color: #050510; near: 30; far: 120" vr-mode-ui="enabled: false">
         
         <a-assets>
             <img id="grid-texture" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10'%3E%3Crect width='10' height='10' fill='none' stroke='%232BD2FF' stroke-width='0.3' stroke-opacity='0.15'/%3E%3C/svg%3E">
         </a-assets>
 
-        <a-entity id="rig" position="0 0 70" rotation="0 180 0" movement-controls="speed: 0.15">
-            <a-entity id="camera" camera look-controls position="0 1.6 0">
-                <a-cursor color="#2BD2FF" fuse="false" raycaster="objects: [clickable]"></a-cursor>
+        <!-- CAMERA RIG WITH PROPER WASD CONTROLS -->
+        <a-entity id="rig" position="0 0 70" rotation="0 180 0" movement-controls="speed: 0.25">
+            <!-- pointerLockEnabled: true makes it behave like an FPS game where the mouse hides and WASD matches where you look -->
+            <a-entity id="camera" camera look-controls="pointerLockEnabled: true" position="0 1.6 0">
+                <a-cursor color="#2BD2FF" fuse="false" raycaster="objects: .clickable"></a-cursor>
             </a-entity>
             <a-entity laser-controls="hand: left" teleport-controls="cameraRig: #rig; teleportOrigin: #camera; button: trigger"></a-entity>
-            <a-entity laser-controls="hand: right" teleport-controls="cameraRig: #rig; teleportOrigin: #camera; button: trigger" raycaster="objects: [clickable]"></a-entity>
+            <a-entity laser-controls="hand: right" teleport-controls="cameraRig: #rig; teleportOrigin: #camera; button: trigger" raycaster="objects: .clickable"></a-entity>
         </a-entity>
 
+        <!-- ENVIRONMENT -->
         <a-sky color="#050510"></a-sky>
         <a-entity star-system></a-entity>
         <a-light type="ambient" color="#1a1a3e" intensity="0.4"></a-light>
         <a-plane position="0 0 -10" rotation="-90 0 0" width="100" height="170" color="#0A0A2E" material="src: #grid-texture; repeat: 100 170"></a-plane>
 
-        -->
+        <!-- PERIMETER WALLS -->
         <a-entity id="walls">
             <a-box position="0 4 75" width="100" height="8" depth="1" color="#12122A"></a-box>
             <a-box position="0 8 75" width="100" height="0.2" depth="1.1" color="#12122A" emissive="#FF3CAC" emissiveIntensity="0.8"></a-box>
@@ -332,7 +374,7 @@
             <a-box position="51 8 -10" width="1.1" height="0.2" depth="170" color="#12122A" emissive="#2BD2FF" emissiveIntensity="0.8"></a-box>
         </a-entity>
 
-        -->
+        <!-- ENTRY SEQUENCE -->
         <a-entity id="entry-sequence">
             <a-box position="-5 3.5 68" width="1.5" height="7" depth="1.5" color="#12122A" emissive="#FF3CAC" emissiveIntensity="0.9"></a-box>
             <a-box position="5 3.5 68" width="1.5" height="7" depth="1.5" color="#12122A" emissive="#FF3CAC" emissiveIntensity="0.9"></a-box>
@@ -357,7 +399,7 @@
             <a-text value="SECURITY CHECK" color="#FF3CAC" align="center" position="0 5.5 43" billboard></a-text>
         </a-entity>
 
-        -->
+        <!-- WAYFINDING -->
         <a-entity arrow-path></a-entity>
         
         <a-entity kiosk-proximity position="5 1 35">
@@ -366,7 +408,7 @@
             <a-text value="ZONE GUIDE" color="#2BD2FF" align="center" position="0 0.4 -0.17" rotation="0 180 0" width="3"></a-text>
         </a-entity>
 
-        -->
+        <!-- MAIN ARENA ZONES -->
         <a-entity id="main-arena">
             
             <a-entity position="-30 1.25 20">
@@ -448,7 +490,7 @@
 
         </a-entity>
 
-        -->
+        <!-- MAIN STAGE -->
         <a-entity id="main-stage">
             <a-box position="0 0.5 -88" width="30" height="1" depth="12" color="#1a1a3a" emissive="#FF3CAC" emissiveIntensity="0.4"></a-box>
             <a-plane position="0 7 -94" width="28" height="12" color="#FFFFFF" emissive="#2BD2FF" emissiveIntensity="1"></a-plane>
