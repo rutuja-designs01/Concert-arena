@@ -3,512 +3,472 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebXR Concert Arena</title>
-
-    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.2.0/dist/aframe-extras.min.js"></script>
-
+    <title>The Vesperal Ingress: Arena Optimization</title>
+    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@700&family=Montserrat:wght@900&display=swap" rel="stylesheet">
     <style>
-        /* === UI OVERLAYS & STYLING === */
-        body, html { margin: 0; padding: 0; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #050510; }
+        :root { --accent: #00ffff; --bg: #02020a; }
+        body { margin: 0; overflow: hidden; background-color: var(--bg); font-family: 'Oswald', sans-serif; }
         
-        .ui-panel {
-            position: fixed;
-            z-index: 999;
-            pointer-events: auto;
-            background: #0a0a2edd;
+        #hud-container {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; padding: 30px; box-sizing: border-box;
+            display: flex; flex-direction: column; justify-content: space-between;
+            color: white; z-index: 10;
         }
 
-        /* Top Bar */
-        #top-bar {
-            top: 0; left: 0; right: 0;
-            height: 44px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid #FF3CAC;
+        #top-row { display: flex; justify-content: space-between; align-items: flex-start; }
+        
+        .status-panel {
+            background: rgba(0, 0, 0, 0.75); border-left: 4px solid var(--accent);
+            padding: 15px 25px; backdrop-filter: blur(15px);
         }
-        #top-title {
-            color: #FF3CAC;
-            font-size: 18px;
-            font-weight: 600;
-            padding-left: 16px;
-            text-shadow: 0 0 5px #FF3CAC;
-        }
-        #top-live {
-            color: #FFD93D;
-            font-size: 16px;
-            font-weight: 600;
-            padding-right: 16px;
-            animation: pulse-live 1s infinite alternate;
-        }
+        .step-label { font-size: 0.8rem; color: var(--accent); letter-spacing: 3px; text-transform: uppercase; }
+        .goal-label { font-size: 1.8rem; font-weight: 700; margin-top: 5px; }
 
-        @keyframes pulse-live {
-            from { opacity: 1; text-shadow: 0 0 8px #FFD93D; }
-            to { opacity: 0.3; text-shadow: none; }
-        }
-
-        /* Bottom Right: VR Toggle */
-        #vr-btn {
-            bottom: 20px; right: 20px;
-            border: 1px solid #2BD2FF;
-            color: #2BD2FF;
-            padding: 10px 20px;
-            border-radius: 8px;
-            font-size: 14px;
-            cursor: pointer;
-            text-shadow: 0 0 5px #2BD2FF;
-            box-shadow: 0 0 10px rgba(43, 210, 255, 0.3);
-            transition: all 0.3s;
-        }
-        #vr-btn:hover { background: rgba(43, 210, 255, 0.2); }
-
-        /* Bottom Left: Minimap */
         #minimap-container {
-            bottom: 20px; left: 20px;
-            border: 1px solid #2BD2FF;
-            border-radius: 8px;
-            padding: 10px;
-            box-shadow: 0 0 15px rgba(43, 210, 255, 0.2);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
+            width: 180px; height: 180px; background: rgba(0,0,0,0.8);
+            border: 2px solid rgba(0, 255, 255, 0.3); border-radius: 50%;
+            position: relative; overflow: hidden; pointer-events: auto;
         }
-        #minimap-label { color: #2BD2FF; font-size: 12px; font-weight: bold; margin-bottom: 5px; letter-spacing: 2px;}
-        #minimap-canvas { background: #0a0a2e; border-radius: 4px; }
+        #minimap-canvas { width: 100%; height: 100%; }
 
-        /* Bottom Center: Navigation Instructions */
-        #nav-instructions {
-            bottom: 20px; left: 50%;
-            transform: translateX(-50%);
-            border: 1px solid #52FA7C;
-            border-radius: 8px;
-            padding: 10px 20px;
-            color: #52FA7C;
-            font-size: 14px;
-            text-align: center;
-            box-shadow: 0 0 10px rgba(82, 250, 124, 0.2);
-            text-shadow: 0 0 5px #52FA7C;
-            pointer-events: none; /* Let clicks pass through to canvas */
+        #toc-panel {
+            background: rgba(0,0,0,0.75); padding: 20px; border-right: 4px solid var(--accent);
+            pointer-events: auto; max-width: 250px; backdrop-filter: blur(10px);
+        }
+        .toc-item {
+            padding: 12px; margin: 5px 0; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.05);
+            font-size: 0.9rem; transition: 0.3s; opacity: 0.5;
+        }
+        .toc-item:hover { background: rgba(0, 255, 255, 0.1); opacity: 1; }
+        .toc-item.active { opacity: 1; color: var(--accent); border-bottom-color: var(--accent); font-weight: 700; }
+
+        #controls-hint {
+            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+            text-align: center; font-size: 0.7rem; letter-spacing: 2px; opacity: 0.6; color: white;
         }
 
-        /* Center: Zone Directory Panel */
-        #zone-directory {
-            top: 50%; left: 50%;
-            transform: translate(-50%, -50%);
-            width: 280px;
-            border: 1px solid #2BD2FF;
-            border-radius: 12px;
-            padding: 16px;
-            box-shadow: 0 0 20px rgba(43, 210, 255, 0.4);
-            display: none; /* Hidden by default */
+        button {
+            background: var(--accent); border: none; color: black; font-weight: 900;
+            padding: 12px 24px; cursor: pointer; text-transform: uppercase;
+            font-family: 'Oswald'; transition: 0.3s; pointer-events: auto; margin-top: 10px;
         }
-        #zone-directory h2 { color: #2BD2FF; text-align: center; margin-top: 0; font-size: 18px;}
-        .zone-row {
-            display: flex; justify-content: space-between; align-items: center;
-            margin-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px;
-        }
-        .zone-name { color: #fff; font-size: 14px; }
-        .go-btn {
-            background: transparent; border: 1px solid #2BD2FF; color: #2BD2FF;
-            padding: 4px 12px; border-radius: 4px; cursor: pointer;
-            font-size: 12px; font-weight: bold;
-        }
-        .go-btn:hover { background: rgba(43, 210, 255, 0.3); }
-
+        button:hover { filter: brightness(1.2); transform: translateY(-2px); }
     </style>
-
-    <script>
-        /* === CUSTOM A-FRAME COMPONENTS === */
-
-        // 1. Billboard: Makes entity face the camera (FIXED: Added safety checks & World Position)
-        AFRAME.registerComponent('billboard', {
-            tick: function () {
-                var cameraEl = document.querySelector('#camera');
-                if (!cameraEl || !cameraEl.object3D) return; // Wait until camera is fully loaded
-                
-                var target = new THREE.Vector3();
-                cameraEl.object3D.getWorldPosition(target);
-                
-                // Keep text upright by forcing the Y position to match the sign's Y position
-                var myPos = new THREE.Vector3();
-                this.el.object3D.getWorldPosition(myPos);
-                target.y = myPos.y; 
-                
-                this.el.object3D.lookAt(target);
-            }
-        });
-
-        // 2. Scanner Toggle: Red/Green security lights
-        AFRAME.registerComponent('scanner-toggle', {
-            init: function () {
-                this.el.addEventListener('click', () => {
-                    let red = document.querySelector('#red-light');
-                    let green = document.querySelector('#green-light');
-                    let isRedOn = red.getAttribute('emissiveIntensity') == "1";
-                    
-                    red.setAttribute('emissiveIntensity', isRedOn ? "0" : "1");
-                    green.setAttribute('emissiveIntensity', isRedOn ? "1" : "0");
-                });
-            }
-        });
-
-        // 3. Kiosk Proximity: Show HTML Panel if within 4m (FIXED: Added safety checks)
-        AFRAME.registerComponent('kiosk-proximity', {
-            tick: function () {
-                let rigEl = document.querySelector('#rig');
-                if (!rigEl || !rigEl.object3D) return; // Wait until rig is fully loaded
-                
-                let rig = rigEl.object3D;
-                let kiosk = this.el.object3D;
-                let distance = rig.position.distanceTo(kiosk.position);
-                let panel = document.getElementById('zone-directory');
-                
-                // Show panel if close, hide if far
-                if (distance < 4 && panel.style.display !== 'block') {
-                    panel.style.display = 'block';
-                    // Only attempt to unlock mouse if it's currently locked
-                    if (document.pointerLockElement) {
-                        document.exitPointerLock(); 
-                    }
-                } else if (distance >= 5 && panel.style.display === 'block') {
-                    panel.style.display = 'none';
-                }
-            }
-        });
-
-        // 4. Star System Generator
-        AFRAME.registerComponent('star-system', {
-            init: function() {
-                for(let i=0; i<40; i++) {
-                    let star = document.createElement('a-sphere');
-                    star.setAttribute('radius', '0.05');
-                    star.setAttribute('color', '#ffffff');
-                    star.setAttribute('emissive', '#ffffff');
-                    let x = (Math.random() - 0.5) * 100;
-                    let y = 25 + Math.random() * 35;
-                    let z = (Math.random() - 0.5) * 160;
-                    star.setAttribute('position', `${x} ${y} ${z}`);
-                    this.el.appendChild(star);
-                }
-            }
-        });
-
-        // 5. Ground Arrow Path Generator
-        AFRAME.registerComponent('arrow-path', {
-            init: function() {
-                for(let z=60; z>=-80; z-=8) {
-                    let arrow = document.createElement('a-entity');
-                    arrow.setAttribute('position', `0 0.05 ${z}`);
-                    arrow.setAttribute('rotation', '-90 0 0');
-
-                    // Draw chevron using two thin boxes
-                    let leftBox = document.createElement('a-box');
-                    leftBox.setAttribute('width', '0.2'); leftBox.setAttribute('height', '1.5'); leftBox.setAttribute('depth', '0.05');
-                    leftBox.setAttribute('color', '#FF3CAC'); leftBox.setAttribute('emissive', '#FF3CAC');
-                    leftBox.setAttribute('rotation', '0 0 -45'); leftBox.setAttribute('position', '-0.5 0 0');
-                    leftBox.setAttribute('animation', 'property: material.emissiveIntensity; from: 0.3; to: 1; dur: 1200; dir: alternate; loop: true');
-
-                    let rightBox = document.createElement('a-box');
-                    rightBox.setAttribute('width', '0.2'); rightBox.setAttribute('height', '1.5'); rightBox.setAttribute('depth', '0.05');
-                    rightBox.setAttribute('color', '#FF3CAC'); rightBox.setAttribute('emissive', '#FF3CAC');
-                    rightBox.setAttribute('rotation', '0 0 45'); rightBox.setAttribute('position', '0.5 0 0');
-                    rightBox.setAttribute('animation', 'property: material.emissiveIntensity; from: 0.3; to: 1; dur: 1200; dir: alternate; loop: true');
-
-                    arrow.appendChild(leftBox); arrow.appendChild(rightBox);
-                    this.el.appendChild(arrow);
-                }
-            }
-        });
-
-        // 6. Crowd Generator
-        AFRAME.registerComponent('crowd-system', {
-            init: function() {
-                const colors = ['#FF3CAC', '#2BD2FF', '#52FA7C', '#FFD93D'];
-                for(let i=0; i<40; i++) {
-                    let person = document.createElement('a-entity');
-                    let x = (Math.random() - 0.5) * 40; 
-                    let z = -70 - Math.random() * 10; 
-                    let color = colors[Math.floor(Math.random() * colors.length)];
-                    person.setAttribute('position', `${x} 0 ${z}`);
-
-                    let body = document.createElement('a-cylinder');
-                    body.setAttribute('radius', '0.25'); body.setAttribute('height', '1.2');
-                    body.setAttribute('position', '0 0.6 0'); body.setAttribute('color', '#12122A');
-                    body.setAttribute('emissive', color); body.setAttribute('emissiveIntensity', '0.5');
-
-                    let head = document.createElement('a-sphere');
-                    head.setAttribute('radius', '0.2'); head.setAttribute('position', '0 1.4 0');
-                    head.setAttribute('color', '#12122A'); head.setAttribute('emissive', color);
-                    head.setAttribute('emissiveIntensity', '0.8');
-
-                    person.appendChild(body); person.appendChild(head);
-                    this.el.appendChild(person);
-                }
-            }
-        });
-
-        /* === HUD LOGIC === */
-        window.addEventListener('load', () => {
-            // VR Toggle
-            const scene = document.querySelector('a-scene');
-            const vrBtn = document.getElementById('vr-btn');
-            vrBtn.addEventListener('click', () => {
-                if (scene.is('vr-mode')) {
-                    scene.exitVR();
-                    vrBtn.innerText = "Enter VR Mode";
-                } else {
-                    scene.enterVR();
-                    vrBtn.innerText = "Exit VR Mode";
-                }
-            });
-
-            // Minimap Drawer
-            const canvas = document.getElementById('minimap-canvas');
-            const ctx = canvas.getContext('2d');
-            const rig = document.querySelector('#rig');
-            let blink = false;
-
-            setInterval(() => {
-                blink = !blink;
-                ctx.fillStyle = '#0a0a2e';
-                ctx.fillRect(0, 0, 180, 160);
-
-                // Map Math (Arena bounds x: -50 to 50, z: -95 to 75)
-                const mapX = (x) => (x + 50) * 1.6 + 10;
-                const mapZ = (z) => (z + 95) * 0.8 + 10;
-
-                // Arena Outline
-                ctx.strokeStyle = '#2BD2FF'; ctx.strokeRect(10, 10, 160, 136);
-
-                // Stage
-                ctx.fillStyle = '#FF3CAC'; ctx.fillRect(mapX(-15), mapZ(-95), 48, 10);
-
-                // Zones
-                const drawZone = (x, z, c) => { ctx.fillStyle = c; ctx.fillRect(mapX(x)-3, mapZ(z)-3, 6, 6); }
-                drawZone(-30, 20, '#2BD2FF'); drawZone(30, 10, '#FFD93D'); drawZone(-25, -10, '#FF3CAC');
-                drawZone(28, -30, '#FFD93D'); drawZone(-20, -50, '#52FA7C'); drawZone(20, -55, '#2BD2FF'); drawZone(0, -60, '#52FA7C');
-
-                // Player Dot (FIXED: Added safety check for rig.object3D)
-                if(rig && rig.object3D && blink) {
-                    ctx.fillStyle = '#FFFFFF';
-                    ctx.beginPath();
-                    ctx.arc(mapX(rig.object3D.position.x), mapZ(rig.object3D.position.z), 4, 0, 2*Math.PI);
-                    ctx.fill();
-                }
-            }, 300);
-        });
-
-        // Directory Teleport Logic
-        function teleportTo(coords) {
-            document.querySelector('#rig').setAttribute('position', coords);
-            document.getElementById('zone-directory').style.display = 'none';
-        }
-    </script>
 </head>
 <body>
 
-    <div id="top-bar" class="ui-panel">
-        <div id="top-title">CONCERT ARENA</div>
-        <div id="top-live">LIVE TONIGHT</div>
-    </div>
-
-    <button id="vr-btn" class="ui-panel">Enter VR Mode</button>
-
-    <div id="minimap-container" class="ui-panel">
-        <div id="minimap-label">MAP</div>
-        <canvas id="minimap-canvas" width="180" height="160"></canvas>
-    </div>
-
-    <div id="nav-instructions" class="ui-panel">
-        <b>DESKTOP:</b> Click screen to lock mouse. Use <b>W A S D</b> to walk. Press <b>ESC</b> for menus.
-    </div>
-
-    <div id="zone-directory" class="ui-panel">
-        <h2>ZONE GUIDE</h2>
-        <div class="zone-row"><span class="zone-name">1. CHECK-IN</span> <button class="go-btn" onclick="teleportTo('-30 0 20')">GO</button></div>
-        <div class="zone-row"><span class="zone-name">2. SPONSORS</span> <button class="go-btn" onclick="teleportTo('30 0 10')">GO</button></div>
-        <div class="zone-row"><span class="zone-name">3. PHOTO BOOTH</span> <button class="go-btn" onclick="teleportTo('-25 0 -10')">GO</button></div>
-        <div class="zone-row"><span class="zone-name">4. FOOD & DRINKS</span> <button class="go-btn" onclick="teleportTo('28 0 -30')">GO</button></div>
-        <div class="zone-row"><span class="zone-name">5. ART MARKET</span> <button class="go-btn" onclick="teleportTo('-20 0 -50')">GO</button></div>
-        <div class="zone-row"><span class="zone-name">6. LOUNGE</span> <button class="go-btn" onclick="teleportTo('20 0 -55')">GO</button></div>
-        <div class="zone-row"><span class="zone-name">7. EXHIBITION</span> <button class="go-btn" onclick="teleportTo('0 0 -60')">GO</button></div>
-        <div class="zone-row" style="border:none;"><span class="zone-name">★ MAIN STAGE</span> <button class="go-btn" onclick="teleportTo('0 0 -65')" style="border-color:#FF3CAC; color:#FF3CAC;">GO</button></div>
-    </div>
-
-    <!-- === A-FRAME SCENE === -->
-    <a-scene fog="type: linear; color: #050510; near: 30; far: 120" vr-mode-ui="enabled: false">
-        
-        <a-assets>
-            <img id="grid-texture" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10'%3E%3Crect width='10' height='10' fill='none' stroke='%232BD2FF' stroke-width='0.3' stroke-opacity='0.15'/%3E%3C/svg%3E">
-        </a-assets>
-
-        <!-- CAMERA RIG WITH PROPER WASD CONTROLS -->
-        <a-entity id="rig" position="0 0 70" rotation="0 180 0" movement-controls="speed: 0.25">
-            <!-- pointerLockEnabled: true makes it behave like an FPS game where the mouse hides and WASD matches where you look -->
-            <a-entity id="camera" camera look-controls="pointerLockEnabled: true" position="0 1.6 0">
-                <a-cursor color="#2BD2FF" fuse="false" raycaster="objects: .clickable"></a-cursor>
-            </a-entity>
-            <a-entity laser-controls="hand: left" teleport-controls="cameraRig: #rig; teleportOrigin: #camera; button: trigger"></a-entity>
-            <a-entity laser-controls="hand: right" teleport-controls="cameraRig: #rig; teleportOrigin: #camera; button: trigger" raycaster="objects: .clickable"></a-entity>
-        </a-entity>
-
-        <!-- ENVIRONMENT -->
-        <a-sky color="#050510"></a-sky>
-        <a-entity star-system></a-entity>
-        <a-light type="ambient" color="#1a1a3e" intensity="0.4"></a-light>
-        <a-plane position="0 0 -10" rotation="-90 0 0" width="100" height="170" color="#0A0A2E" material="src: #grid-texture; repeat: 100 170"></a-plane>
-
-        <!-- PERIMETER WALLS -->
-        <a-entity id="walls">
-            <a-box position="0 4 75" width="100" height="8" depth="1" color="#12122A"></a-box>
-            <a-box position="0 8 75" width="100" height="0.2" depth="1.1" color="#12122A" emissive="#FF3CAC" emissiveIntensity="0.8"></a-box>
-
-            <a-box position="0 4 -95" width="100" height="8" depth="1" color="#12122A"></a-box>
-            <a-box position="0 8 -95" width="100" height="0.2" depth="1.1" color="#12122A" emissive="#FF3CAC" emissiveIntensity="0.8"></a-box>
-
-            <a-box position="-51 4 -10" width="1" height="8" depth="170" color="#12122A"></a-box>
-            <a-box position="-51 8 -10" width="1.1" height="0.2" depth="170" color="#12122A" emissive="#2BD2FF" emissiveIntensity="0.8"></a-box>
-
-            <a-box position="51 4 -10" width="1" height="8" depth="170" color="#12122A"></a-box>
-            <a-box position="51 8 -10" width="1.1" height="0.2" depth="170" color="#12122A" emissive="#2BD2FF" emissiveIntensity="0.8"></a-box>
-        </a-entity>
-
-        <!-- ENTRY SEQUENCE -->
-        <a-entity id="entry-sequence">
-            <a-box position="-5 3.5 68" width="1.5" height="7" depth="1.5" color="#12122A" emissive="#FF3CAC" emissiveIntensity="0.9"></a-box>
-            <a-box position="5 3.5 68" width="1.5" height="7" depth="1.5" color="#12122A" emissive="#FF3CAC" emissiveIntensity="0.9"></a-box>
-            <a-box position="0 6.5 68" width="11" height="1" depth="1" color="#12122A" emissive="#FF3CAC" emissiveIntensity="0.9"></a-box>
-            <a-text value="WELCOME" color="#FFD93D" align="center" width="12" position="0 8.5 68"></a-text>
-
-            <a-box position="-12 1.5 55" width="5" height="3" depth="3" color="#12122A" emissive="#2BD2FF" emissiveIntensity="0.7"></a-box>
-            <a-box position="-12 0.5 54" width="4" height="1" depth="0.5" color="#1a1a3e"></a-box>
-            <a-text value="TICKET BOOKING" color="#2BD2FF" align="center" width="8" position="-12 4 55" billboard></a-text>
-
-            <a-box position="-5 1.25 50" width="3" height="2.5" depth="2" color="#12122A" emissive="#52FA7C" emissiveIntensity="0.7"></a-box>
-            <a-text value="WRISTBAND" color="#52FA7C" align="center" width="6" position="-5 4 50" billboard></a-text>
-
-            <a-box position="-2.5 2 43" width="0.8" height="4" depth="0.8" color="#12122A"></a-box>
-            <a-box position="2.5 2 43" width="0.8" height="4" depth="0.8" color="#12122A"></a-box>
-            <a-box position="0 4 43" width="6" height="0.5" depth="0.8" color="#12122A"></a-box>
+    <div id="hud-container">
+        <div id="top-row">
+            <div class="status-panel">
+                <div id="step-text" class="step-label">PHASE 01: ARRIVAL</div>
+                <div id="goal-text" class="goal-label">WELCOME TO THE XR EXPERIENCE</div>
+            </div>
             
-            <a-sphere id="red-light" radius="0.25" position="-1 4.8 43" color="#FF0000" emissive="#FF0000" emissiveIntensity="1"></a-sphere>
-            <a-sphere id="green-light" radius="0.25" position="1 4.8 43" color="#00FF00" emissive="#00FF00" emissiveIntensity="0"></a-sphere>
+            <div id="minimap-container">
+                <canvas id="minimap-canvas"></canvas>
+            </div>
+        </div>
+
+        <div id="toc-panel">
+            <div style="font-size: 0.7rem; opacity: 0.5; margin-bottom: 10px; letter-spacing: 2px;">INGRESS PROTOCOL</div>
+            <div class="toc-item active" onclick="fastTravel(0)">01. ENTRANCE</div>
+            <div class="toc-item" onclick="fastTravel(1)">02. BAND COLLECTION</div>
+            <div class="toc-item" onclick="fastTravel(2)">03. SECURITY CLEARANCE</div>
+            <div class="toc-item" onclick="fastTravel(3)">04. ARENA ACCESS</div>
+            <div class="toc-item" onclick="fastTravel(4)">05. YOUR SEAT</div>
+            <button onclick="resetNavigation()" style="width: 100%;">RESET CYCLE</button>
+        </div>
+    </div>
+
+    <div id="controls-hint">WASD: MOVE | Q/E: ROTATE | CLICK NODES TO TELEPORT</div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <script>
+        /**
+         * ARENA NAVIGATION & HUD SYSTEM v11.0
+         * Subtitle: "The Computational Respite"
+         */
+
+        let scene, camera, renderer, userGroup, arenaGroup, navigationLine;
+        let miniMapCtx, miniMapCanvas;
+        let raycaster = new THREE.Raycaster();
+        let mouse = new THREE.Vector2();
+        let markers = [], overheadArt = [], stars, confettiParticles = [];
+        let currentStep = 0;
+        let sunGroup, sunLight, ambientLight;
+        let confettiTriggered = false;
+        let grassMesh, floorPlane;
+
+        const NAVIGATION_NODES = [
+            { name: "GRAND ENTRANCE", pos: new THREE.Vector3(0, 0, 30), goal: "COLLECT YOUR WRISTBAND", instruction: "PHASE 01: ARRIVAL" },
+            { name: "BAND COLLECTION", pos: new THREE.Vector3(30, 0, 5), goal: "PROCEED TO SECURITY", instruction: "PHASE 02: CREDENTIALS" },
+            { name: "SECURITY POINT", pos: new THREE.Vector3(15, 0, -25), goal: "ENTER THE ARENA GATE", instruction: "PHASE 03: CLEARANCE" },
+            { name: "ARENA ACCESS", pos: new THREE.Vector3(-35, 0, -65), goal: "PROCEED TO THE DIAMOND PLUS SECTION", instruction: "PHASE 04: ARENA ACCESS", reveal: true },
+            { name: "YOUR SEAT", pos: new THREE.Vector3(0, 0, -105), goal: "FINAL LOCALIZATION COMPLETE", instruction: "PHASE 05: TERMINAL" }
+        ];
+
+        const keys = { w: false, a: false, s: false, d: false, q: false, e: false };
+
+        function init() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 5000);
             
-            <a-box class="clickable" scanner-toggle position="3.5 0.75 43" width="0.4" height="1.5" depth="0.4" color="#444" emissive="#2BD2FF" emissiveIntensity="0.4"></a-box>
-            <a-text value="SECURITY CHECK" color="#FF3CAC" align="center" position="0 5.5 43" billboard></a-text>
-        </a-entity>
+            renderer = new THREE.WebGLRenderer({ 
+                antialias: true, 
+                powerPreference: "high-performance",
+                precision: "highp"
+            });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.xr.enabled = true;
+            document.body.appendChild(renderer.domElement);
 
-        <!-- WAYFINDING -->
-        <a-entity arrow-path></a-entity>
-        
-        <a-entity kiosk-proximity position="5 1 35">
-            <a-box width="1" height="2" depth="0.3" color="#12122A" emissive="#2BD2FF" emissiveIntensity="0.5"></a-box>
-            <a-plane position="0 0 -0.16" rotation="0 180 0" width="0.9" height="1.2" color="#000" emissive="#2BD2FF" emissiveIntensity="0.3"></a-plane>
-            <a-text value="ZONE GUIDE" color="#2BD2FF" align="center" position="0 0.4 -0.17" rotation="0 180 0" width="3"></a-text>
-        </a-entity>
+            userGroup = new THREE.Group();
+            userGroup.position.set(0, 2.0, 60); 
+            userGroup.add(camera);
+            scene.add(userGroup);
 
-        <!-- MAIN ARENA ZONES -->
-        <a-entity id="main-arena">
+            ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+            scene.add(ambientLight);
+
+            setupSun();
+            setupEnvironment(); 
+            setupArenaLayout();
+            setupCelestialMap();
+            createNavigationMarkers();
+            createNavigationPath();
+            setupOverheadArt();
+
+            miniMapCanvas = document.getElementById('minimap-canvas');
+            miniMapCtx = miniMapCanvas.getContext('2d');
+
+            window.addEventListener('resize', onResize);
+            window.addEventListener('click', onInteraction);
+            window.addEventListener('keydown', (e) => toggleKey(e.code, true));
+            window.addEventListener('keyup', (e) => toggleKey(e.code, false));
+
+            animate();
+        }
+
+        function setupSun() {
+            sunGroup = new THREE.Group();
+            sunLight = new THREE.DirectionalLight(0xffaa44, 2.5);
+            sunLight.position.set(0, 400, -1500); 
+            sunGroup.add(sunLight);
             
-            <a-entity position="-30 1.25 20">
-                <a-box position="-3.1 0 0" width="3" height="2.5" depth="2" color="#12122A" emissive="#2BD2FF" emissiveIntensity="0.6"></a-box>
-                <a-box position="0 0 0" width="3" height="2.5" depth="2" color="#12122A" emissive="#2BD2FF" emissiveIntensity="0.6"></a-box>
-                <a-box position="3.1 0 0" width="3" height="2.5" depth="2" color="#12122A" emissive="#2BD2FF" emissiveIntensity="0.6"></a-box>
-                <a-entity position="0 3 0" billboard>
-                    <a-circle radius="0.6" position="-2 0 0" color="#FFD93D" emissive="#FFD93D" emissiveIntensity="0.5"><a-text value="1" color="#000" align="center" width="8" position="0 0 0.05"></a-text></a-circle>
-                    <a-text value="CHECK-IN" color="#2BD2FF" width="10" position="-1 0 0"></a-text>
-                </a-entity>
-            </a-entity>
+            const sunGeo = new THREE.SphereGeometry(60, 32, 32);
+            const sunMat = new THREE.MeshBasicMaterial({ color: 0xffdd88 });
+            const sunMesh = new THREE.Mesh(sunGeo, sunMat);
+            sunMesh.position.copy(sunLight.position);
+            sunGroup.add(sunMesh);
 
-            <a-entity position="30 2 10">
-                <a-plane rotation="0 -90 0" width="15" height="4" color="#12122A"></a-plane>
-                <a-box position="-0.1 0 -5" width="0.1" height="3" depth="2" color="#000" emissive="#FF3CAC" emissiveIntensity="0.8"></a-box>
-                <a-box position="-0.1 0 -1.5" width="0.1" height="3" depth="2" color="#000" emissive="#2BD2FF" emissiveIntensity="0.8"></a-box>
-                <a-box position="-0.1 0 2" width="0.1" height="3" depth="2" color="#000" emissive="#52FA7C" emissiveIntensity="0.8"></a-box>
-                <a-box position="-0.1 0 5.5" width="0.1" height="3" depth="2" color="#000" emissive="#FFD93D" emissiveIntensity="0.8"></a-box>
-                <a-entity position="0 3.5 0" billboard>
-                    <a-circle radius="0.6" position="-2 0 0" color="#FFD93D" emissive="#FFD93D" emissiveIntensity="0.5"><a-text value="2" color="#000" align="center" width="8" position="0 0 0.05"></a-text></a-circle>
-                    <a-text value="SPONSORS" color="#FFD93D" width="10" position="-1 0 0"></a-text>
-                </a-entity>
-            </a-entity>
+            for(let i=1; i<=3; i++) {
+                const glowGeo = new THREE.SphereGeometry(60 + i*40, 32, 32);
+                const glowMat = new THREE.MeshBasicMaterial({ 
+                    color: 0xffaa00, 
+                    transparent: true, 
+                    opacity: 0.2 / i,
+                    blending: THREE.AdditiveBlending
+                });
+                const glowMesh = new THREE.Mesh(glowGeo, glowMat);
+                glowMesh.position.copy(sunLight.position);
+                sunGroup.add(glowMesh);
+            }
+            scene.add(sunGroup);
+        }
 
-            <a-entity position="-25 2 -10">
-                <a-box position="-2 0 0" width="0.2" height="4" depth="0.2" color="#000" emissive="#FF3CAC" emissiveIntensity="1"></a-box>
-                <a-box position="2 0 0" width="0.2" height="4" depth="0.2" color="#000" emissive="#FF3CAC" emissiveIntensity="1"></a-box>
-                <a-box position="0 2 0" width="4" height="0.2" depth="0.2" color="#000" emissive="#FF3CAC" emissiveIntensity="1"></a-box>
-                <a-entity position="0 3 0" billboard>
-                    <a-circle radius="0.6" position="-3 0 0" color="#FFD93D" emissive="#FFD93D" emissiveIntensity="0.5"><a-text value="3" color="#000" align="center" width="8" position="0 0 0.05"></a-text></a-circle>
-                    <a-text value="PHOTO BOOTH" color="#FF3CAC" width="10" position="-2 0 0"></a-text>
-                </a-entity>
-            </a-entity>
+        function toggleKey(code, state) {
+            const m = { 'KeyW': 'w', 'KeyA': 'a', 'KeyS': 's', 'KeyD': 'd', 'KeyQ': 'q', 'KeyE': 'e' };
+            if (m[code]) keys[m[code]] = state;
+        }
 
-            <a-entity position="28 1.25 -30">
-                <a-box position="-3.5 0 0" width="3" height="2.5" depth="3" color="#12122A" emissive="#FFD93D" emissiveIntensity="0.5"></a-box>
-                <a-box position="0 0 0" width="3" height="2.5" depth="3" color="#12122A" emissive="#FFD93D" emissiveIntensity="0.5"></a-box>
-                <a-box position="3.5 0 0" width="3" height="2.5" depth="3" color="#12122A" emissive="#FFD93D" emissiveIntensity="0.5"></a-box>
-                <a-entity position="0 3 0" billboard>
-                    <a-circle radius="0.6" position="-3 0 0" color="#FFD93D" emissive="#FFD93D" emissiveIntensity="0.5"><a-text value="4" color="#000" align="center" width="8" position="0 0 0.05"></a-text></a-circle>
-                    <a-text value="FOOD & DRINKS" color="#FFD93D" width="10" position="-2 0 0"></a-text>
-                </a-entity>
-            </a-entity>
+        function setupEnvironment() {
+            floorPlane = new THREE.Mesh(
+                new THREE.PlaneGeometry(3000, 3000),
+                new THREE.MeshStandardMaterial({ color: 0x020a02, roughness: 1.0 })
+            );
+            floorPlane.rotation.x = -Math.PI / 2;
+            scene.add(floorPlane);
 
-            <a-entity position="-20 1 -50">
-                <a-box position="-3 0 -2" width="2" height="2" depth="2" color="#12122A" emissive="#FF3CAC" emissiveIntensity="0.6"></a-box>
-                <a-box position="0 0 2" width="2" height="2" depth="2" color="#12122A" emissive="#2BD2FF" emissiveIntensity="0.6"></a-box>
-                <a-box position="3 0 -1" width="2" height="2" depth="2" color="#12122A" emissive="#52FA7C" emissiveIntensity="0.6"></a-box>
-                <a-entity position="0 3 0" billboard>
-                    <a-circle radius="0.6" position="-2.5 0 0" color="#FFD93D" emissive="#FFD93D" emissiveIntensity="0.5"><a-text value="5" color="#000" align="center" width="8" position="0 0 0.05"></a-text></a-circle>
-                    <a-text value="ART MARKET" color="#52FA7C" width="10" position="-1.5 0 0"></a-text>
-                </a-entity>
-            </a-entity>
+            // Maintaining high density but with a toggleable mesh
+            const grassCount = 2000000; 
+            const grassGeo = new THREE.PlaneGeometry(0.25, 1.4); 
+            const grassMat = new THREE.MeshStandardMaterial({ 
+                color: 0x0a330a, 
+                side: THREE.DoubleSide,
+                alphaTest: 0.5,
+                roughness: 0.8
+            });
+            grassMesh = new THREE.InstancedMesh(grassGeo, grassMat, grassCount);
+            
+            const dummy = new THREE.Object3D();
+            for (let i = 0; i < grassCount; i++) {
+                const range = 1000;
+                dummy.position.set((Math.random()-0.5)*range, 0.7, (Math.random()-0.5)*range);
+                // Exclude the arena core area (centered around z=-130) from initial grass distribution
+                if (dummy.position.z < -60) {
+                     dummy.position.z += 1000; // Move far away out of view if in arena zone
+                }
+                dummy.rotation.y = Math.random() * Math.PI;
+                dummy.rotation.z = (Math.random()-0.5) * 0.3; 
+                dummy.scale.setScalar(0.8 + Math.random() * 0.4);
+                dummy.updateMatrix();
+                grassMesh.setMatrixAt(i, dummy.matrix);
+            }
+            scene.add(grassMesh);
 
-            <a-entity position="20 0.25 -55">
-                <a-box position="-2 0 2" width="1" height="0.5" depth="1" color="#12122A" emissive="#2BD2FF" emissiveIntensity="0.5"></a-box>
-                <a-box position="2 0 2" width="1" height="0.5" depth="1" color="#12122A" emissive="#2BD2FF" emissiveIntensity="0.5"></a-box>
-                <a-box position="-3 0 0" width="1" height="0.5" depth="1" color="#12122A" emissive="#2BD2FF" emissiveIntensity="0.5"></a-box>
-                <a-box position="3 0 0" width="1" height="0.5" depth="1" color="#12122A" emissive="#2BD2FF" emissiveIntensity="0.5"></a-box>
-                <a-box position="-2 0 -2" width="1" height="0.5" depth="1" color="#12122A" emissive="#2BD2FF" emissiveIntensity="0.5"></a-box>
-                <a-box position="2 0 -2" width="1" height="0.5" depth="1" color="#12122A" emissive="#2BD2FF" emissiveIntensity="0.5"></a-box>
-                <a-entity position="0 3.75 0" billboard>
-                    <a-circle radius="0.6" position="-2 0 0" color="#FFD93D" emissive="#FFD93D" emissiveIntensity="0.5"><a-text value="6" color="#000" align="center" width="8" position="0 0 0.05"></a-text></a-circle>
-                    <a-text value="LOUNGE" color="#2BD2FF" width="10" position="-1 0 0"></a-text>
-                </a-entity>
-            </a-entity>
+            for(let i=0; i<8000; i++) {
+                const f = new THREE.Mesh(new THREE.SphereGeometry(0.2, 4, 4), new THREE.MeshBasicMaterial({ color: [0xff00ff, 0xffff00, 0x00ffff, 0xffffff, 0xff5500][i%5] }));
+                f.position.set((Math.random()-0.5)*1000, 0.1, (Math.random()-0.5)*800 + 100);
+                scene.add(f);
+            }
 
-            <a-entity position="0 2 -60">
-                <a-box position="-5 0 0" width="0.2" height="4" depth="8" color="#0A0A2E" emissive="#52FA7C" emissiveIntensity="0.3"></a-box>
-                <a-box position="5 0 0" width="0.2" height="4" depth="8" color="#0A0A2E" emissive="#52FA7C" emissiveIntensity="0.3"></a-box>
-                <a-box position="0 0 -4" width="10" height="4" depth="0.2" color="#0A0A2E" emissive="#52FA7C" emissiveIntensity="0.3"></a-box>
-                <a-box position="-3.5 0 4" width="3" height="4" depth="0.2" color="#0A0A2E" emissive="#52FA7C" emissiveIntensity="0.3"></a-box>
-                <a-box position="3.5 0 4" width="3" height="4" depth="0.2" color="#0A0A2E" emissive="#52FA7C" emissiveIntensity="0.3"></a-box>
-                <a-entity position="0 3 4.5" billboard>
-                    <a-circle radius="0.6" position="-2.5 0 0" color="#FFD93D" emissive="#FFD93D" emissiveIntensity="0.5"><a-text value="7" color="#000" align="center" width="8" position="0 0 0.05"></a-text></a-circle>
-                    <a-text value="EXHIBITION" color="#52FA7C" width="10" position="-1.5 0 0"></a-text>
-                </a-entity>
-            </a-entity>
+            const welcomeLabel = createSprite("WELCOME TO THE XR EXPERIENCE", 50, "#00ffff", true);
+            welcomeLabel.position.set(0, 10, 45);
+            welcomeLabel.scale.set(15, 3, 1);
+            scene.add(welcomeLabel);
+        }
 
-        </a-entity>
+        function setupCelestialMap() {
+            const starGeo = new THREE.BufferGeometry();
+            const posArray = new Float32Array(8000 * 3);
+            for(let i=0; i<8000*3; i++) posArray[i] = (Math.random()-0.5) * 3000;
+            starGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+            stars = new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 1.5, transparent: true }));
+            scene.add(stars);
+        }
 
-        <!-- MAIN STAGE -->
-        <a-entity id="main-stage">
-            <a-box position="0 0.5 -88" width="30" height="1" depth="12" color="#1a1a3a" emissive="#FF3CAC" emissiveIntensity="0.4"></a-box>
-            <a-plane position="0 7 -94" width="28" height="12" color="#FFFFFF" emissive="#2BD2FF" emissiveIntensity="1"></a-plane>
+        function setupArenaLayout() {
+            arenaGroup = new THREE.Group();
+            arenaGroup.position.z = -130; 
+            arenaGroup.visible = false;
+            scene.add(arenaGroup);
 
-            <a-box position="-16 3 -88" width="2" height="6" depth="2" color="#000" emissive="#2BD2FF" emissiveIntensity="0.6"></a-box>
-            <a-box position="16 3 -88" width="2" height="6" depth="2" color="#000" emissive="#2BD2FF" emissiveIntensity="0.6"></a-box>
+            // Concert Stage Architecture
+            const stageMat = new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.9, roughness: 0.1 });
+            const main = new THREE.Mesh(new THREE.BoxGeometry(30, 2.5, 12), stageMat);
+            const catwalk = new THREE.Mesh(new THREE.BoxGeometry(8, 2.5, 20), stageMat);
+            catwalk.position.z = 16;
+            const bStage = new THREE.Mesh(new THREE.BoxGeometry(14, 2.5, 12), stageMat);
+            bStage.position.z = 32;
+            arenaGroup.add(main, catwalk, bStage);
 
-            <a-light type="spot" position="0 15 -85" target="#stage-center" color="#FF3CAC" intensity="2" angle="30" penumbra="0.5"></a-light>
-            <a-light type="spot" position="-8 15 -85" target="#stage-center" color="#2BD2FF" intensity="1.5" angle="40" penumbra="0.5"></a-light>
-            <a-light type="spot" position="8 15 -85" target="#stage-center" color="#FFD93D" intensity="1.5" angle="40" penumbra="0.5"></a-light>
-            <a-entity id="stage-center" position="0 0 -88"></a-entity>
+            // LED Screen - Focal Point
+            const screen = new THREE.Mesh(new THREE.PlaneGeometry(30, 15), new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0x00aaff, emissiveIntensity: 0.6 }));
+            screen.position.set(0, 10, -5.8);
+            arenaGroup.add(screen);
 
-            <a-box position="0 0.1 -81.5" width="6" height="0.2" depth="1" color="#12122A" emissive="#FF3CAC" emissiveIntensity="0.4"></a-box>
-            <a-box position="0 0.3 -82.5" width="6" height="0.2" depth="1" color="#12122A" emissive="#FF3CAC" emissiveIntensity="0.4"></a-box>
+            // Surrounding Seating Structure (U-shape around the screen/stage)
+            const sections = [
+                // Front Floor (Diamond Plus)
+                { color: 0x4444ff, x: 0, z: 55, w: 22, d: 15, people: 100 },
+                // Left Wing
+                { color: 0x9966ff, x: 25, z: 25, w: 14, d: 20, people: 80 },
+                { color: 0xcc99ff, x: 45, z: 25, w: 14, d: 30, people: 120 },
+                // Right Wing
+                { color: 0x9966ff, x: -25, z: 25, w: 14, d: 20, people: 80 },
+                { color: 0xcc99ff, x: -45, z: 25, w: 14, d: 30, people: 120 },
+                // Back Tiers
+                { color: 0xffaa00, x: 0, z: 80, w: 60, d: 15, people: 150 },
+                { color: 0xff4400, x: 0, z: 100, w: 80, d: 20, people: 200 }
+            ];
+            sections.forEach(s => populateSection(arenaGroup, s.color, s.x, s.z, s.w, s.d, s.people));
 
-            <a-entity crowd-system></a-entity>
-        </a-entity>
+            const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.6, 200, 16), new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.7 }));
+            beam.position.set(0, 100, 55); 
+            arenaGroup.add(beam);
+        }
 
-    </a-scene>
+        function populateSection(parent, color, x, z, w, d, peopleCount) {
+            const base = new THREE.Mesh(new THREE.BoxGeometry(w, 0.5, d), new THREE.MeshStandardMaterial({ color }));
+            base.position.set(x, 0.25, z);
+            parent.add(base);
+
+            // Increased density of people per section
+            for (let i = 0; i < peopleCount; i++) {
+                const person = new THREE.Group();
+                const body = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.25, 1.4, 8), new THREE.MeshStandardMaterial({ color: 0x222222 }));
+                const head = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 8), new THREE.MeshStandardMaterial({ color: 0x444444 }));
+                head.position.y = 0.85;
+                person.add(body, head);
+                person.position.set(x + (Math.random()-0.5)*(w-2), 0.9, z + (Math.random()-0.5)*(d-2));
+                parent.add(person);
+            }
+        }
+
+        function createNavigationPath() {
+            const pts = NAVIGATION_NODES.map(n => n.pos.clone().add(new THREE.Vector3(0, 1.8, 0)));
+            const curve = new THREE.CatmullRomCurve3(pts);
+            const tube = new THREE.Mesh(
+                new THREE.TubeGeometry(curve, 100, 0.18, 8, false),
+                new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending })
+            );
+            navigationLine = tube;
+            scene.add(navigationLine);
+        }
+
+        function setupOverheadArt() {
+            const pts = NAVIGATION_NODES.map(n => n.pos.clone().add(new THREE.Vector3(0, 15, 0)));
+            const curve = new THREE.CatmullRomCurve3(pts);
+            const colors = [0xff00ff, 0x00ffff, 0xffff00];
+            for(let i=0; i<80; i++) {
+                const t = i / 79;
+                const pos = curve.getPoint(t);
+                const mesh = new THREE.Mesh(new THREE.TorusKnotGeometry(1.5, 0.25, 64, 8), new THREE.MeshStandardMaterial({ color: colors[i%3], emissive: colors[i%3], emissiveIntensity: 0.7 }));
+                mesh.position.copy(pos).add(new THREE.Vector3((Math.random()-0.5)*15, (Math.random()-0.5)*8, 0));
+                scene.add(mesh);
+                overheadArt.push({ mesh, rot: Math.random()*0.03 + 0.01 });
+            }
+        }
+
+        function createNavigationMarkers() {
+            NAVIGATION_NODES.forEach((node, idx) => {
+                const g = new THREE.Group();
+                g.position.copy(node.pos);
+
+                const ring = new THREE.Mesh(new THREE.RingGeometry(2, 2.4, 32), new THREE.MeshBasicMaterial({ color: 0x00ffff, side: THREE.DoubleSide, transparent: true, opacity: 0.9 }));
+                ring.rotation.x = -Math.PI/2;
+                ring.position.y = 1.6; 
+                g.add(ring);
+
+                const sprite = createSprite(node.name, 120, "white", true);
+                sprite.position.y = 6; sprite.scale.set(12, 3, 1);
+                g.add(sprite);
+
+                g.userData = { idx };
+                scene.add(g);
+                markers.push({ g, ring });
+            });
+        }
+
+        function createSprite(text, size, color, shadow) {
+            const can = document.createElement('canvas');
+            const ctx = can.getContext('2d');
+            can.width = 1024; can.height = 256;
+            ctx.font = `900 ${size}px 'Oswald'`;
+            ctx.textAlign = 'center'; ctx.fillStyle = color;
+            if(shadow) { ctx.shadowColor = 'cyan'; ctx.shadowBlur = 20; }
+            ctx.fillText(text, 512, 128);
+            return new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(can) }));
+        }
+
+        function triggerConfetti() {
+            if (confettiTriggered) return;
+            confettiTriggered = true;
+            for(let i=0; i<300; i++) {
+                const p = new THREE.Mesh(new THREE.PlaneGeometry(0.35, 0.35), new THREE.MeshBasicMaterial({ color: Math.random()*0xffffff, side: THREE.DoubleSide }));
+                p.position.set((Math.random()-0.5)*40, 20, 30);
+                p.userData = { vel: new THREE.Vector3((Math.random()-0.5)*0.4, -Math.random()*0.2 - 0.15, (Math.random()-0.5)*0.4), rot: Math.random()*0.2 };
+                scene.add(p);
+                confettiParticles.push(p);
+            }
+        }
+
+        function onInteraction(e) {
+            mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera);
+            const hits = raycaster.intersectObjects(markers.map(m => m.g), true);
+            if (hits.length > 0) {
+                let o = hits[0].object;
+                while (o.parent && !o.userData.hasOwnProperty('idx')) o = o.parent;
+                fastTravel(o.userData.idx);
+            }
+        }
+
+        function fastTravel(idx) {
+            if (idx > currentStep + 1) return;
+            const n = NAVIGATION_NODES[idx];
+            userGroup.position.set(n.pos.x, 2.0, n.pos.z + 8);
+            currentStep = Math.max(currentStep, idx);
+            
+            document.getElementById('step-text').innerText = n.instruction;
+            document.getElementById('goal-text').innerText = n.goal;
+            
+            // STATE CHANGE: Hide grass upon arena access (Step 3 and beyond)
+            if (n.reveal) {
+                arenaGroup.visible = true;
+                grassMesh.visible = false;
+                floorPlane.material.color.set(0x111111); // Modern dark floor for arena
+            } else {
+                grassMesh.visible = true;
+            }
+
+            if (idx === 0) triggerConfetti();
+            document.querySelectorAll('.toc-item').forEach((item, i) => item.classList.toggle('active', i === idx));
+        }
+
+        function updateMinimap() {
+            miniMapCtx.clearRect(0, 0, 180, 180);
+            const cx = 90, cy = 90, s = 0.6;
+            miniMapCtx.strokeStyle = 'rgba(0, 255, 255, 0.2)';
+            miniMapCtx.beginPath();
+            NAVIGATION_NODES.forEach((n, i) => {
+                const px = cx + n.pos.x * s, py = cy + n.pos.z * s;
+                if(i===0) miniMapCtx.moveTo(px, py); else miniMapCtx.lineTo(px, py);
+            });
+            miniMapCtx.stroke();
+            NAVIGATION_NODES.forEach((n, i) => {
+                miniMapCtx.fillStyle = i <= currentStep ? '#00ff00' : '#444';
+                miniMapCtx.beginPath(); miniMapCtx.arc(cx + n.pos.x*s, cy + n.pos.z*s, 4, 0, Math.PI*2); miniMapCtx.fill();
+            });
+            miniMapCtx.fillStyle = '#fff';
+            miniMapCtx.beginPath(); miniMapCtx.arc(cx + userGroup.position.x*s, cy + userGroup.position.z*s, 6, 0, Math.PI*2); miniMapCtx.fill();
+        }
+
+        function resetNavigation() {
+            currentStep = 0; arenaGroup.visible = false; confettiTriggered = false; grassMesh.visible = true;
+            fastTravel(0);
+            userGroup.position.set(0, 2.0, 60);
+        }
+
+        function onResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            renderer.setAnimationLoop(() => {
+                const time = performance.now() * 0.001;
+                const cycle = (Math.sin(time * 0.04) + 1) / 2; 
+                sunGroup.rotation.x = cycle * -Math.PI; 
+                const afternoonSky = new THREE.Color(0x87ceeb), eveningSky = new THREE.Color(0x02020a);
+                const currentSky = afternoonSky.clone().lerp(eveningSky, cycle);
+                scene.background = currentSky;
+                scene.fog = new THREE.FogExp2(currentSky, 0.01);
+                sunLight.intensity = 3.0 * (1 - cycle);
+                ambientLight.intensity = 0.5 * (1 - cycle) + 0.1;
+                stars.material.opacity = cycle;
+
+                if (!renderer.xr.isPresenting) {
+                    const dir = new THREE.Vector3(); camera.getWorldDirection(dir); dir.y = 0; dir.normalize();
+                    const side = new THREE.Vector3().crossVectors(camera.up, dir).normalize();
+                    const speed = 0.6;
+                    if (keys.w) userGroup.position.addScaledVector(dir, speed);
+                    if (keys.s) userGroup.position.addScaledVector(dir, -speed);
+                    if (keys.a) userGroup.position.addScaledVector(side, speed);
+                    if (keys.d) userGroup.position.addScaledVector(side, -speed);
+                    if (keys.q) userGroup.rotation.y += 0.045;
+                    if (keys.e) userGroup.rotation.y -= 0.045;
+                }
+
+                confettiParticles.forEach((p, i) => {
+                    p.position.add(p.userData.vel);
+                    p.rotation.x += p.userData.rot;
+                    if(p.position.y < 0) { scene.remove(p); confettiParticles.splice(i, 1); }
+                });
+
+                overheadArt.forEach(a => a.mesh.rotation.y += a.rot);
+                navigationLine.material.opacity = 0.4 + Math.sin(time*3)*0.2;
+                updateMinimap();
+                renderer.render(scene, camera);
+            });
+        }
+
+        init();
+    </script>
 </body>
 </html>
