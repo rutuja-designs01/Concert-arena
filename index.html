@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Vesperal Ingress: Arena Optimization</title>
+    <title>The Vesperal Ingress: Final Localization</title>
     <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@700&family=Montserrat:wght@900&display=swap" rel="stylesheet">
     <style>
         :root { --accent: #00ffff; --bg: #02020a; }
@@ -72,7 +72,7 @@
 
         <div id="toc-panel">
             <div style="font-size: 0.7rem; opacity: 0.5; margin-bottom: 10px; letter-spacing: 2px;">INGRESS PROTOCOL</div>
-            <div class="toc-item active" onclick="fastTravel(0)">01. ENTRANCE</div>
+            <div class="toc-item active" onclick="fastTravel(0)">01. MONOLITH / ENTRANCE</div>
             <div class="toc-item" onclick="fastTravel(1)">02. BAND COLLECTION</div>
             <div class="toc-item" onclick="fastTravel(2)">03. SECURITY CLEARANCE</div>
             <div class="toc-item" onclick="fastTravel(3)">04. ARENA ACCESS</div>
@@ -87,8 +87,8 @@
 
     <script>
         /**
-         * ARENA NAVIGATION & HUD SYSTEM v11.0
-         * Subtitle: "The Computational Respite"
+         * ARENA NAVIGATION & HUD SYSTEM v6.0
+         * Jarvis Personal Edition
          */
 
         let scene, camera, renderer, userGroup, arenaGroup, navigationLine;
@@ -99,14 +99,13 @@
         let currentStep = 0;
         let sunGroup, sunLight, ambientLight;
         let confettiTriggered = false;
-        let grassMesh, floorPlane;
 
         const NAVIGATION_NODES = [
             { name: "GRAND ENTRANCE", pos: new THREE.Vector3(0, 0, 30), goal: "COLLECT YOUR WRISTBAND", instruction: "PHASE 01: ARRIVAL" },
             { name: "BAND COLLECTION", pos: new THREE.Vector3(30, 0, 5), goal: "PROCEED TO SECURITY", instruction: "PHASE 02: CREDENTIALS" },
             { name: "SECURITY POINT", pos: new THREE.Vector3(15, 0, -25), goal: "ENTER THE ARENA GATE", instruction: "PHASE 03: CLEARANCE" },
-            { name: "ARENA ACCESS", pos: new THREE.Vector3(-35, 0, -65), goal: "PROCEED TO THE DIAMOND PLUS SECTION", instruction: "PHASE 04: ARENA ACCESS", reveal: true },
-            { name: "YOUR SEAT", pos: new THREE.Vector3(0, 0, -105), goal: "FINAL LOCALIZATION COMPLETE", instruction: "PHASE 05: TERMINAL" }
+            { name: "ARENA ACCESS", pos: new THREE.Vector3(-30, 0, -60), goal: "FIND THE DIAMOND PLUS SECTION", instruction: "PHASE 04: ARENA INGRESS", reveal: true },
+            { name: "YOUR SEAT", pos: new THREE.Vector3(0, 0, -100), goal: "FINAL LOCALIZATION COMPLETE", instruction: "PHASE 05: TERMINAL" }
         ];
 
         const keys = { w: false, a: false, s: false, d: false, q: false, e: false };
@@ -115,22 +114,19 @@
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 5000);
             
-            renderer = new THREE.WebGLRenderer({ 
-                antialias: true, 
-                powerPreference: "high-performance",
-                precision: "highp"
-            });
+            renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
             renderer.xr.enabled = true;
             document.body.appendChild(renderer.domElement);
 
             userGroup = new THREE.Group();
-            userGroup.position.set(0, 2.0, 60); 
+            userGroup.position.set(0, 1.6, 60); 
             userGroup.add(camera);
             scene.add(userGroup);
 
-            ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+            // Lighting Logic
+            ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
             scene.add(ambientLight);
 
             setupSun();
@@ -155,21 +151,23 @@
         function setupSun() {
             sunGroup = new THREE.Group();
             sunLight = new THREE.DirectionalLight(0xffaa44, 2.5);
-            sunLight.position.set(0, 400, -1500); 
+            sunLight.position.set(0, 0, -1500); 
             sunGroup.add(sunLight);
             
-            const sunGeo = new THREE.SphereGeometry(60, 32, 32);
-            const sunMat = new THREE.MeshBasicMaterial({ color: 0xffdd88 });
+            // Solar Body
+            const sunGeo = new THREE.SphereGeometry(40, 32, 32);
+            const sunMat = new THREE.MeshBasicMaterial({ color: 0xffaa00 });
             const sunMesh = new THREE.Mesh(sunGeo, sunMat);
             sunMesh.position.copy(sunLight.position);
             sunGroup.add(sunMesh);
 
-            for(let i=1; i<=3; i++) {
-                const glowGeo = new THREE.SphereGeometry(60 + i*40, 32, 32);
+            // Corona/Glow Layers (originating from sun center)
+            for(let i=1; i<=4; i++) {
+                const glowGeo = new THREE.SphereGeometry(40 + i*15, 32, 32);
                 const glowMat = new THREE.MeshBasicMaterial({ 
-                    color: 0xffaa00, 
+                    color: 0xff6600, 
                     transparent: true, 
-                    opacity: 0.2 / i,
+                    opacity: 0.3 / i,
                     blending: THREE.AdditiveBlending
                 });
                 const glowMesh = new THREE.Mesh(glowGeo, glowMat);
@@ -185,141 +183,123 @@
         }
 
         function setupEnvironment() {
-            floorPlane = new THREE.Mesh(
-                new THREE.PlaneGeometry(3000, 3000),
-                new THREE.MeshStandardMaterial({ color: 0x020a02, roughness: 1.0 })
+            // Expansive Grass Field
+            const plane = new THREE.Mesh(
+                new THREE.PlaneGeometry(2000, 2000),
+                new THREE.MeshStandardMaterial({ color: 0x051a05, roughness: 1.0 })
             );
-            floorPlane.rotation.x = -Math.PI / 2;
-            scene.add(floorPlane);
+            plane.rotation.x = -Math.PI / 2;
+            scene.add(plane);
 
-            // Maintaining high density but with a toggleable mesh
-            const grassCount = 2000000; 
-            const grassGeo = new THREE.PlaneGeometry(0.25, 1.4); 
-            const grassMat = new THREE.MeshStandardMaterial({ 
-                color: 0x0a330a, 
-                side: THREE.DoubleSide,
-                alphaTest: 0.5,
-                roughness: 0.8
-            });
-            grassMesh = new THREE.InstancedMesh(grassGeo, grassMat, grassCount);
-            
-            const dummy = new THREE.Object3D();
-            for (let i = 0; i < grassCount; i++) {
-                const range = 1000;
-                dummy.position.set((Math.random()-0.5)*range, 0.7, (Math.random()-0.5)*range);
-                // Exclude the arena core area (centered around z=-130) from initial grass distribution
-                if (dummy.position.z < -60) {
-                     dummy.position.z += 1000; // Move far away out of view if in arena zone
-                }
-                dummy.rotation.y = Math.random() * Math.PI;
-                dummy.rotation.z = (Math.random()-0.5) * 0.3; 
-                dummy.scale.setScalar(0.8 + Math.random() * 0.4);
-                dummy.updateMatrix();
-                grassMesh.setMatrixAt(i, dummy.matrix);
-            }
-            scene.add(grassMesh);
-
-            for(let i=0; i<8000; i++) {
-                const f = new THREE.Mesh(new THREE.SphereGeometry(0.2, 4, 4), new THREE.MeshBasicMaterial({ color: [0xff00ff, 0xffff00, 0x00ffff, 0xffffff, 0xff5500][i%5] }));
-                f.position.set((Math.random()-0.5)*1000, 0.1, (Math.random()-0.5)*800 + 100);
+            // Nature: Flowers
+            const flowerGeo = new THREE.SphereGeometry(0.15, 4, 4);
+            const flowerColors = [0xff00ff, 0xffff00, 0x00ffff, 0xffffff, 0xff5500];
+            for(let i=0; i<3000; i++) {
+                const f = new THREE.Mesh(flowerGeo, new THREE.MeshBasicMaterial({ color: flowerColors[i%5] }));
+                f.position.set((Math.random()-0.5)*800, 0.05, (Math.random()-0.5)*800);
                 scene.add(f);
             }
 
-            const welcomeLabel = createSprite("WELCOME TO THE XR EXPERIENCE", 50, "#00ffff", true);
-            welcomeLabel.position.set(0, 10, 45);
+            // Welcome Text at Start
+            const welcomeLabel = createSprite("WELCOME TO THE XR EXPERIENCE OF A CONCERT", 40, "#00ffff", false);
+            welcomeLabel.position.set(0, 6, 50);
             welcomeLabel.scale.set(15, 3, 1);
             scene.add(welcomeLabel);
+
+            // Grand Monoliths/Visuals before entrance
+            for(let i=0; i<10; i++) {
+                const mGeo = new THREE.BoxGeometry(2, 20, 2);
+                const mMat = new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.9 });
+                const m = new THREE.Mesh(mGeo, mMat);
+                m.position.set( (i % 2 === 0 ? -12 : 12), 10, 45 - (i*5));
+                scene.add(m);
+            }
         }
 
         function setupCelestialMap() {
             const starGeo = new THREE.BufferGeometry();
-            const posArray = new Float32Array(8000 * 3);
-            for(let i=0; i<8000*3; i++) posArray[i] = (Math.random()-0.5) * 3000;
+            const posArray = new Float32Array(5000 * 3);
+            for(let i=0; i<5000*3; i++) posArray[i] = (Math.random()-0.5) * 2000;
             starGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
-            stars = new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 1.5, transparent: true }));
+            stars = new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 1.0, transparent: true }));
             scene.add(stars);
         }
 
         function setupArenaLayout() {
             arenaGroup = new THREE.Group();
-            arenaGroup.position.z = -130; 
+            arenaGroup.position.z = -120; 
             arenaGroup.visible = false;
             scene.add(arenaGroup);
 
-            // Concert Stage Architecture
-            const stageMat = new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.9, roughness: 0.1 });
-            const main = new THREE.Mesh(new THREE.BoxGeometry(30, 2.5, 12), stageMat);
-            const catwalk = new THREE.Mesh(new THREE.BoxGeometry(8, 2.5, 20), stageMat);
-            catwalk.position.z = 16;
-            const bStage = new THREE.Mesh(new THREE.BoxGeometry(14, 2.5, 12), stageMat);
-            bStage.position.z = 32;
+            // Stage (Based on Image Reference)
+            const stageMat = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.7 });
+            const main = new THREE.Mesh(new THREE.BoxGeometry(20, 2, 10), stageMat);
+            const catwalk = new THREE.Mesh(new THREE.BoxGeometry(6, 2, 15), stageMat);
+            catwalk.position.z = 12.5;
+            const bStage = new THREE.Mesh(new THREE.BoxGeometry(10, 2, 8), stageMat);
+            bStage.position.z = 24;
             arenaGroup.add(main, catwalk, bStage);
 
-            // LED Screen - Focal Point
-            const screen = new THREE.Mesh(new THREE.PlaneGeometry(30, 15), new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0x00aaff, emissiveIntensity: 0.6 }));
-            screen.position.set(0, 10, -5.8);
-            arenaGroup.add(screen);
-
-            // Surrounding Seating Structure (U-shape around the screen/stage)
+            // Seating with People (Heads included)
             const sections = [
-                // Front Floor (Diamond Plus)
-                { color: 0x4444ff, x: 0, z: 55, w: 22, d: 15, people: 100 },
-                // Left Wing
-                { color: 0x9966ff, x: 25, z: 25, w: 14, d: 20, people: 80 },
-                { color: 0xcc99ff, x: 45, z: 25, w: 14, d: 30, people: 120 },
-                // Right Wing
-                { color: 0x9966ff, x: -25, z: 25, w: 14, d: 20, people: 80 },
-                { color: 0xcc99ff, x: -45, z: 25, w: 14, d: 30, people: 120 },
-                // Back Tiers
-                { color: 0xffaa00, x: 0, z: 80, w: 60, d: 15, people: 150 },
-                { color: 0xff4400, x: 0, z: 100, w: 80, d: 20, people: 200 }
+                { color: 0x4444ff, x: 0, z: 42, w: 14, d: 10, label: "Diamond Plus" },
+                { color: 0x9966ff, x: 12, z: 18, w: 10, d: 8, label: "Festival L" },
+                { color: 0x9966ff, x: -12, z: 18, w: 10, d: 8, label: "Festival R" }
             ];
-            sections.forEach(s => populateSection(arenaGroup, s.color, s.x, s.z, s.w, s.d, s.people));
 
-            const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.6, 200, 16), new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.7 }));
-            beam.position.set(0, 100, 55); 
-            arenaGroup.add(beam);
+            sections.forEach(s => populateSection(arenaGroup, s.color, s.x, s.z, s.w, s.d));
+
+            // Goal Seat Highlight
+            const light = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.2, 0.5, 80, 16),
+                new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.5 })
+            );
+            light.position.set(0, 40, 42); 
+            arenaGroup.add(light);
         }
 
-        function populateSection(parent, color, x, z, w, d, peopleCount) {
+        function populateSection(parent, color, x, z, w, d) {
             const base = new THREE.Mesh(new THREE.BoxGeometry(w, 0.5, d), new THREE.MeshStandardMaterial({ color }));
             base.position.set(x, 0.25, z);
             parent.add(base);
 
-            // Increased density of people per section
-            for (let i = 0; i < peopleCount; i++) {
+            // People: Body (Cylinder) + Head (Sphere)
+            for (let i = 0; i < 20; i++) {
                 const person = new THREE.Group();
-                const body = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.25, 1.4, 8), new THREE.MeshStandardMaterial({ color: 0x222222 }));
-                const head = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 8), new THREE.MeshStandardMaterial({ color: 0x444444 }));
-                head.position.y = 0.85;
+                const body = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, 1.2, 8), new THREE.MeshStandardMaterial({ color: 0x444444 }));
+                const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 8), new THREE.MeshStandardMaterial({ color: 0x666666 }));
+                head.position.y = 0.75;
                 person.add(body, head);
-                person.position.set(x + (Math.random()-0.5)*(w-2), 0.9, z + (Math.random()-0.5)*(d-2));
+                person.position.set(x + (Math.random()-0.5)*(w-1), 0.8, z + (Math.random()-0.5)*(d-1));
                 parent.add(person);
             }
         }
 
         function createNavigationPath() {
-            const pts = NAVIGATION_NODES.map(n => n.pos.clone().add(new THREE.Vector3(0, 1.8, 0)));
+            const pts = NAVIGATION_NODES.map(n => n.pos.clone().add(new THREE.Vector3(0, 0.2, 0)));
             const curve = new THREE.CatmullRomCurve3(pts);
             const tube = new THREE.Mesh(
-                new THREE.TubeGeometry(curve, 100, 0.18, 8, false),
-                new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending })
+                new THREE.TubeGeometry(curve, 100, 0.15, 8, false),
+                new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.4 })
             );
             navigationLine = tube;
             scene.add(navigationLine);
         }
 
         function setupOverheadArt() {
-            const pts = NAVIGATION_NODES.map(n => n.pos.clone().add(new THREE.Vector3(0, 15, 0)));
+            const pts = NAVIGATION_NODES.map(n => n.pos.clone().add(new THREE.Vector3(0, 12, 0)));
             const curve = new THREE.CatmullRomCurve3(pts);
             const colors = [0xff00ff, 0x00ffff, 0xffff00];
-            for(let i=0; i<80; i++) {
-                const t = i / 79;
+            for(let i=0; i<50; i++) {
+                const t = i / 49;
                 const pos = curve.getPoint(t);
-                const mesh = new THREE.Mesh(new THREE.TorusKnotGeometry(1.5, 0.25, 64, 8), new THREE.MeshStandardMaterial({ color: colors[i%3], emissive: colors[i%3], emissiveIntensity: 0.7 }));
-                mesh.position.copy(pos).add(new THREE.Vector3((Math.random()-0.5)*15, (Math.random()-0.5)*8, 0));
+                const mesh = new THREE.Mesh(
+                    new THREE.TorusKnotGeometry(1.2, 0.2, 64, 8),
+                    new THREE.MeshStandardMaterial({ color: colors[i%3], emissive: colors[i%3], emissiveIntensity: 0.6 })
+                );
+                mesh.position.copy(pos).add(new THREE.Vector3((Math.random()-0.5)*8, (Math.random()-0.5)*4, 0));
                 scene.add(mesh);
-                overheadArt.push({ mesh, rot: Math.random()*0.03 + 0.01 });
+                overheadArt.push({ mesh, rot: Math.random()*0.02 + 0.01 });
             }
         }
 
@@ -328,13 +308,12 @@
                 const g = new THREE.Group();
                 g.position.copy(node.pos);
 
-                const ring = new THREE.Mesh(new THREE.RingGeometry(2, 2.4, 32), new THREE.MeshBasicMaterial({ color: 0x00ffff, side: THREE.DoubleSide, transparent: true, opacity: 0.9 }));
+                const ring = new THREE.Mesh(new THREE.RingGeometry(1.5, 1.8, 32), new THREE.MeshBasicMaterial({ color: 0x00ffff, side: THREE.DoubleSide }));
                 ring.rotation.x = -Math.PI/2;
-                ring.position.y = 1.6; 
                 g.add(ring);
 
                 const sprite = createSprite(node.name, 120, "white", true);
-                sprite.position.y = 6; sprite.scale.set(12, 3, 1);
+                sprite.position.y = 5; sprite.scale.set(10, 2.5, 1);
                 g.add(sprite);
 
                 g.userData = { idx };
@@ -349,7 +328,7 @@
             can.width = 1024; can.height = 256;
             ctx.font = `900 ${size}px 'Oswald'`;
             ctx.textAlign = 'center'; ctx.fillStyle = color;
-            if(shadow) { ctx.shadowColor = 'cyan'; ctx.shadowBlur = 20; }
+            if(shadow) { ctx.shadowColor = 'cyan'; ctx.shadowBlur = 15; }
             ctx.fillText(text, 512, 128);
             return new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(can) }));
         }
@@ -357,10 +336,13 @@
         function triggerConfetti() {
             if (confettiTriggered) return;
             confettiTriggered = true;
-            for(let i=0; i<300; i++) {
-                const p = new THREE.Mesh(new THREE.PlaneGeometry(0.35, 0.35), new THREE.MeshBasicMaterial({ color: Math.random()*0xffffff, side: THREE.DoubleSide }));
-                p.position.set((Math.random()-0.5)*40, 20, 30);
-                p.userData = { vel: new THREE.Vector3((Math.random()-0.5)*0.4, -Math.random()*0.2 - 0.15, (Math.random()-0.5)*0.4), rot: Math.random()*0.2 };
+            for(let i=0; i<150; i++) {
+                const p = new THREE.Mesh(
+                    new THREE.PlaneGeometry(0.3, 0.3),
+                    new THREE.MeshBasicMaterial({ color: Math.random()*0xffffff, side: THREE.DoubleSide })
+                );
+                p.position.set((Math.random()-0.5)*20, 10, 30);
+                p.userData = { vel: new THREE.Vector3((Math.random()-0.5)*0.2, -Math.random()*0.2 - 0.05, (Math.random()-0.5)*0.2), rot: Math.random()*0.1 };
                 scene.add(p);
                 confettiParticles.push(p);
             }
@@ -381,28 +363,23 @@
         function fastTravel(idx) {
             if (idx > currentStep + 1) return;
             const n = NAVIGATION_NODES[idx];
-            userGroup.position.set(n.pos.x, 2.0, n.pos.z + 8);
+            userGroup.position.set(n.pos.x, 1.6, n.pos.z + 5);
             currentStep = Math.max(currentStep, idx);
             
             document.getElementById('step-text').innerText = n.instruction;
             document.getElementById('goal-text').innerText = n.goal;
             
-            // STATE CHANGE: Hide grass upon arena access (Step 3 and beyond)
-            if (n.reveal) {
-                arenaGroup.visible = true;
-                grassMesh.visible = false;
-                floorPlane.material.color.set(0x111111); // Modern dark floor for arena
-            } else {
-                grassMesh.visible = true;
-            }
-
+            if (n.reveal) arenaGroup.visible = true;
             if (idx === 0) triggerConfetti();
-            document.querySelectorAll('.toc-item').forEach((item, i) => item.classList.toggle('active', i === idx));
+
+            document.querySelectorAll('.toc-item').forEach((item, i) => {
+                item.classList.toggle('active', i === idx);
+            });
         }
 
         function updateMinimap() {
             miniMapCtx.clearRect(0, 0, 180, 180);
-            const cx = 90, cy = 90, s = 0.6;
+            const cx = 90, cy = 90, s = 0.8;
             miniMapCtx.strokeStyle = 'rgba(0, 255, 255, 0.2)';
             miniMapCtx.beginPath();
             NAVIGATION_NODES.forEach((n, i) => {
@@ -419,9 +396,9 @@
         }
 
         function resetNavigation() {
-            currentStep = 0; arenaGroup.visible = false; confettiTriggered = false; grassMesh.visible = true;
+            currentStep = 0; arenaGroup.visible = false; confettiTriggered = false;
             fastTravel(0);
-            userGroup.position.set(0, 2.0, 60);
+            userGroup.position.set(0, 1.6, 60);
         }
 
         function onResize() {
@@ -433,36 +410,38 @@
         function animate() {
             renderer.setAnimationLoop(() => {
                 const time = performance.now() * 0.001;
-                const cycle = (Math.sin(time * 0.04) + 1) / 2; 
-                sunGroup.rotation.x = cycle * -Math.PI; 
-                const afternoonSky = new THREE.Color(0x87ceeb), eveningSky = new THREE.Color(0x02020a);
-                const currentSky = afternoonSky.clone().lerp(eveningSky, cycle);
-                scene.background = currentSky;
-                scene.fog = new THREE.FogExp2(currentSky, 0.01);
-                sunLight.intensity = 3.0 * (1 - cycle);
-                ambientLight.intensity = 0.5 * (1 - cycle) + 0.1;
+
+                // Solar Transition
+                const cycle = (Math.sin(time * 0.04) + 1) / 2;
+                sunGroup.rotation.x = cycle * -Math.PI;
+                sunLight.intensity = 2.5 - cycle;
+                ambientLight.intensity = 0.3 - (cycle * 0.2);
+                scene.background = new THREE.Color(0x87ceeb).lerp(new THREE.Color(0x02020a), cycle);
                 stars.material.opacity = cycle;
 
+                // WASD Locomotion
                 if (!renderer.xr.isPresenting) {
                     const dir = new THREE.Vector3(); camera.getWorldDirection(dir); dir.y = 0; dir.normalize();
                     const side = new THREE.Vector3().crossVectors(camera.up, dir).normalize();
-                    const speed = 0.6;
+                    const speed = 0.5;
                     if (keys.w) userGroup.position.addScaledVector(dir, speed);
                     if (keys.s) userGroup.position.addScaledVector(dir, -speed);
                     if (keys.a) userGroup.position.addScaledVector(side, speed);
                     if (keys.d) userGroup.position.addScaledVector(side, -speed);
-                    if (keys.q) userGroup.rotation.y += 0.045;
-                    if (keys.e) userGroup.rotation.y -= 0.045;
+                    if (keys.q) userGroup.rotation.y += 0.05;
+                    if (keys.e) userGroup.rotation.y -= 0.05;
                 }
 
+                // Particles
                 confettiParticles.forEach((p, i) => {
                     p.position.add(p.userData.vel);
                     p.rotation.x += p.userData.rot;
+                    p.rotation.y += p.userData.rot;
                     if(p.position.y < 0) { scene.remove(p); confettiParticles.splice(i, 1); }
                 });
 
                 overheadArt.forEach(a => a.mesh.rotation.y += a.rot);
-                navigationLine.material.opacity = 0.4 + Math.sin(time*3)*0.2;
+                navigationLine.material.opacity = 0.25 + Math.sin(time*3)*0.1;
                 updateMinimap();
                 renderer.render(scene, camera);
             });
